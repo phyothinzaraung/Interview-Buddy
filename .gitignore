@@ -1,0 +1,17 @@
+# Secrets
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+
+# Java
+**/target/
+
+# React
+**/node_modules/
+**/dist/
+
+# IDE and OS
+.idea/
+.DS_Store

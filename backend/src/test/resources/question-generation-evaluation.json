@@ -1,0 +1,206 @@
+{
+  "version": 1,
+  "requestedQuestionCount": 5,
+  "scenarios": [
+    {
+      "id": "java-backend-beginner-collections",
+      "roleGroup": "Java Backend Developer",
+      "role": "Java Backend Developer",
+      "difficulty": "BEGINNER",
+      "interviewType": "TECHNICAL",
+      "topic": "Java Collections",
+      "relevanceSignals": ["List, Set, and Map use in application code", "basic selection of collection types"],
+      "difficultySignals": ["foundational behavior", "small examples", "no concurrency or performance tuning"]
+    },
+    {
+      "id": "java-backend-intermediate-concurrency",
+      "roleGroup": "Java Backend Developer",
+      "role": "Java Backend Developer",
+      "difficulty": "INTERMEDIATE",
+      "interviewType": "TECHNICAL",
+      "topic": "Java Concurrency",
+      "relevanceSignals": ["thread safety in backend services", "synchronization or executor usage"],
+      "difficultySignals": ["apply concurrency concepts", "explain tradeoffs", "bounded scenarios"]
+    },
+    {
+      "id": "java-backend-advanced-jvm",
+      "roleGroup": "Java Backend Developer",
+      "role": "Java Backend Developer",
+      "difficulty": "ADVANCED",
+      "interviewType": "TECHNICAL",
+      "topic": "JVM Performance and Garbage Collection",
+      "relevanceSignals": ["diagnose production memory or latency symptoms", "JVM and garbage collection behavior"],
+      "difficultySignals": ["reason from constraints and evidence", "tradeoffs and failure modes", "avoid trivia-only questions"]
+    },
+    {
+      "id": "java-backend-intermediate-api",
+      "roleGroup": "Java Backend Developer",
+      "role": "Java Backend Developer",
+      "difficulty": "INTERMEDIATE",
+      "interviewType": "TECHNICAL",
+      "topic": "REST API Design",
+      "relevanceSignals": ["resource modeling", "HTTP semantics and error responses"],
+      "difficultySignals": ["design a bounded endpoint", "consider validation and compatibility"]
+    },
+    {
+      "id": "spring-boot-beginner-di",
+      "roleGroup": "Spring Boot Developer",
+      "role": "Spring Boot Developer",
+      "difficulty": "BEGINNER",
+      "interviewType": "TECHNICAL",
+      "topic": "Dependency Injection and Beans",
+      "relevanceSignals": ["Spring-managed components", "constructor injection in a small service"],
+      "difficultySignals": ["explain core terms", "simple bean lifecycle or wiring example"]
+    },
+    {
+      "id": "spring-boot-intermediate-transactions",
+      "roleGroup": "Spring Boot Developer",
+      "role": "Spring Boot Developer",
+      "difficulty": "INTERMEDIATE",
+      "interviewType": "TECHNICAL",
+      "topic": "Spring Transactions",
+      "relevanceSignals": ["transaction boundaries in service methods", "rollback behavior and persistence"],
+      "difficultySignals": ["analyze a realistic service flow", "identify common proxy or propagation implications"]
+    },
+    {
+      "id": "spring-boot-advanced-security",
+      "roleGroup": "Spring Boot Developer",
+      "role": "Spring Boot Developer",
+      "difficulty": "ADVANCED",
+      "interviewType": "TECHNICAL",
+      "topic": "Spring Security and OAuth2 Resource Servers",
+      "relevanceSignals": ["JWT validation and authorization in a Spring API", "security filter chain configuration"],
+      "difficultySignals": ["reason about trust boundaries and failure cases", "avoid unsafe security assumptions"]
+    },
+    {
+      "id": "spring-boot-beginner-testing",
+      "roleGroup": "Spring Boot Developer",
+      "role": "Spring Boot Developer",
+      "difficulty": "BEGINNER",
+      "interviewType": "TECHNICAL",
+      "topic": "Spring Boot Testing",
+      "relevanceSignals": ["testing a controller or service", "Spring test support and isolation"],
+      "difficultySignals": ["basic test purpose and setup", "no advanced test infrastructure required"]
+    },
+    {
+      "id": "react-beginner-components",
+      "roleGroup": "React Developer",
+      "role": "React Developer",
+      "difficulty": "BEGINNER",
+      "interviewType": "TECHNICAL",
+      "topic": "React Components, Props, and State",
+      "relevanceSignals": ["component boundaries", "data passed through props and local state"],
+      "difficultySignals": ["foundational component behavior", "simple UI examples"]
+    },
+    {
+      "id": "react-intermediate-hooks",
+      "roleGroup": "React Developer",
+      "role": "React Developer",
+      "difficulty": "INTERMEDIATE",
+      "interviewType": "TECHNICAL",
+      "topic": "React Hooks and Effects",
+      "relevanceSignals": ["stateful function components", "effect dependencies and cleanup"],
+      "difficultySignals": ["debug a realistic behavior", "explain dependency and lifecycle tradeoffs"]
+    },
+    {
+      "id": "react-advanced-performance",
+      "roleGroup": "React Developer",
+      "role": "React Developer",
+      "difficulty": "ADVANCED",
+      "interviewType": "TECHNICAL",
+      "topic": "React Rendering and Performance",
+      "relevanceSignals": ["profile-driven optimization", "render behavior and memoization tradeoffs"],
+      "difficultySignals": ["reason from measured symptoms", "avoid blanket claims that memoization is always beneficial"]
+    },
+    {
+      "id": "node-beginner-event-loop",
+      "roleGroup": "Node.js Developer",
+      "role": "Node.js Developer",
+      "difficulty": "BEGINNER",
+      "interviewType": "TECHNICAL",
+      "topic": "Node.js Event Loop Basics",
+      "relevanceSignals": ["JavaScript runtime behavior on the server", "non-blocking I/O"],
+      "difficultySignals": ["basic ordering or small examples", "no deep libuv internals"]
+    },
+    {
+      "id": "node-intermediate-async-errors",
+      "roleGroup": "Node.js Developer",
+      "role": "Node.js Developer",
+      "difficulty": "INTERMEDIATE",
+      "interviewType": "TECHNICAL",
+      "topic": "Asynchronous Error Handling",
+      "relevanceSignals": ["Promise or async/await failures in service handlers", "propagating errors to HTTP middleware"],
+      "difficultySignals": ["debug a realistic request path", "consider rejected promises and error boundaries"]
+    },
+    {
+      "id": "node-advanced-streams",
+      "roleGroup": "Node.js Developer",
+      "role": "Node.js Developer",
+      "difficulty": "ADVANCED",
+      "interviewType": "TECHNICAL",
+      "topic": "Streams and Backpressure",
+      "relevanceSignals": ["large data processing in Node.js", "stream lifecycle and backpressure handling"],
+      "difficultySignals": ["reason about memory limits and failure handling", "apply stream concepts to production workloads"]
+    },
+    {
+      "id": "fullstack-beginner-api-flow",
+      "roleGroup": "Full Stack Developer",
+      "role": "Full Stack Developer",
+      "difficulty": "BEGINNER",
+      "interviewType": "TECHNICAL",
+      "topic": "Browser-to-API Request Flow",
+      "relevanceSignals": ["frontend form submission", "backend endpoint and response handling"],
+      "difficultySignals": ["describe a straightforward end-to-end flow", "basic validation and status handling"]
+    },
+    {
+      "id": "fullstack-intermediate-auth",
+      "roleGroup": "Full Stack Developer",
+      "role": "Full Stack Developer",
+      "difficulty": "INTERMEDIATE",
+      "interviewType": "TECHNICAL",
+      "topic": "Authentication Across Frontend and Backend",
+      "relevanceSignals": ["credential or token lifecycle across browser and API", "secure request and authorization flow"],
+      "difficultySignals": ["identify realistic security and UX tradeoffs", "avoid recommending unsafe token storage"]
+    },
+    {
+      "id": "fullstack-advanced-data-consistency",
+      "roleGroup": "Full Stack Developer",
+      "role": "Full Stack Developer",
+      "difficulty": "ADVANCED",
+      "interviewType": "TECHNICAL",
+      "topic": "Optimistic Updates and Data Consistency",
+      "relevanceSignals": ["UI state reconciled with API persistence", "conflict and rollback behavior"],
+      "difficultySignals": ["analyze race conditions and user-visible failures", "consider API and UI recovery strategies"]
+    },
+    {
+      "id": "system-design-beginner-url-shortener",
+      "roleGroup": "System Design",
+      "role": "System Design Candidate",
+      "difficulty": "BEGINNER",
+      "interviewType": "SYSTEM_DESIGN",
+      "topic": "Basic URL Shortener Design",
+      "relevanceSignals": ["requirements, API, and simple storage model", "redirect behavior"],
+      "difficultySignals": ["small scale and explicit assumptions", "avoid multi-region infrastructure requirements"]
+    },
+    {
+      "id": "system-design-intermediate-notifications",
+      "roleGroup": "System Design",
+      "role": "System Design Candidate",
+      "difficulty": "INTERMEDIATE",
+      "interviewType": "SYSTEM_DESIGN",
+      "topic": "Notification Delivery Service",
+      "relevanceSignals": ["queues, retries, delivery state, and user preferences", "failure handling"],
+      "difficultySignals": ["compare reasonable component choices", "discuss idempotency and backpressure"]
+    },
+    {
+      "id": "system-design-advanced-feed",
+      "roleGroup": "System Design",
+      "role": "System Design Candidate",
+      "difficulty": "ADVANCED",
+      "interviewType": "SYSTEM_DESIGN",
+      "topic": "Large-Scale Activity Feed",
+      "relevanceSignals": ["high write/read volume", "fanout tradeoffs, ranking, caching, and consistency"],
+      "difficultySignals": ["quantify constraints", "discuss bottlenecks and alternative architectures"]
+    }
+  ]
+}
