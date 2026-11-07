@@ -6,6 +6,8 @@ import com.interviewbuddy.session.model.Difficulty;
 import com.interviewbuddy.session.model.InterviewSession;
 import com.interviewbuddy.session.model.InterviewType;
 import com.interviewbuddy.session.repository.InterviewSessionRepository;
+import com.interviewbuddy.auth.model.UserAccount;
+import com.interviewbuddy.auth.repository.UserAccountRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -14,6 +16,9 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.junit.jupiter.api.BeforeEach;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 
@@ -23,6 +28,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -45,9 +52,23 @@ class InterviewSessionIntegrationTest {
     @Autowired
     private InterviewSessionRepository repository;
 
+    @Autowired
+    private UserAccountRepository userRepository;
+
+    private UserAccount owner;
+
+    @BeforeEach
+    void createOwner() {
+        owner = userRepository.save(new UserAccount("Test Owner", "owner@example.test", "not-a-real-login-hash"));
+    }
+
+    private ResultActions performAsOwner(MockHttpServletRequestBuilder request) throws Exception {
+        return mockMvc.perform(request.with(user(owner.getId().toString())).with(csrf()));
+    }
+
     @Test
     void createsAndPersistsInterviewSession() throws Exception {
-        var result = mockMvc.perform(post("/api/interviews")
+        var result = performAsOwner(post("/api/interviews")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"role":"Backend Engineer","difficulty":"INTERMEDIATE",
@@ -70,12 +91,9 @@ class InterviewSessionIntegrationTest {
     @Test
     void getsSessionById() throws Exception {
         var created = repository.save(new InterviewSession(
-                "Backend Engineer",
-                Difficulty.INTERMEDIATE,
-                InterviewType.TECHNICAL,
-                "Java"));
+                "Backend Engineer", Difficulty.INTERMEDIATE, InterviewType.TECHNICAL, "Java", owner));
 
-        var result = mockMvc.perform(get("/api/interviews/{id}", created.getId()))
+        var result = performAsOwner(get("/api/interviews/{id}", created.getId()))
                 .andExpect(status().isOk())
                 .andReturn();
 
@@ -91,7 +109,7 @@ class InterviewSessionIntegrationTest {
 
     @Test
     void returnsNotFoundForUnknownId() throws Exception {
-        mockMvc.perform(get("/api/interviews/{id}", 99999))
+        performAsOwner(get("/api/interviews/{id}", 99999))
                 .andExpect(status().isNotFound());
     }
 
@@ -99,12 +117,12 @@ class InterviewSessionIntegrationTest {
     void updatesSessionAndPreservesIdAndCreatedAt() throws Exception {
         Instant createdAt = Instant.parse("2026-01-01T10:00:00Z");
         InterviewSession existing = new InterviewSession(
-                "Backend Engineer", Difficulty.INTERMEDIATE, InterviewType.TECHNICAL, "Java");
+                "Backend Engineer", Difficulty.INTERMEDIATE, InterviewType.TECHNICAL, "Java", owner);
         ReflectionTestUtils.setField(existing, "createdAt", createdAt);
         InterviewSession saved = repository.save(existing);
         Long id = saved.getId();
 
-        var result = mockMvc.perform(put("/api/interviews/{id}", id)
+        var result = performAsOwner(put("/api/interviews/{id}", id)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"role":"Product Manager","difficulty":"BEGINNER",
@@ -128,7 +146,7 @@ class InterviewSessionIntegrationTest {
 
     @Test
     void returnsNotFoundWhenUpdatingUnknownSession() throws Exception {
-        mockMvc.perform(put("/api/interviews/{id}", 99999)
+        performAsOwner(put("/api/interviews/{id}", 99999)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"role":"Product Manager","difficulty":"BEGINNER",
@@ -140,19 +158,19 @@ class InterviewSessionIntegrationTest {
     @Test
     void deletesSessionAndItIsNoLongerAvailable() throws Exception {
         InterviewSession saved = repository.save(new InterviewSession(
-                "Backend Engineer", Difficulty.INTERMEDIATE, InterviewType.TECHNICAL, "Java"));
+                "Backend Engineer", Difficulty.INTERMEDIATE, InterviewType.TECHNICAL, "Java", owner));
         Long id = saved.getId();
 
-        var result = mockMvc.perform(delete("/api/interviews/{id}", id))
+        var result = performAsOwner(delete("/api/interviews/{id}", id))
                 .andExpect(status().isNoContent())
                 .andReturn();
 
         assertThat(result.getResponse().getContentAsString()).isEmpty();
         assertThat(repository.findById(id)).isEmpty();
-        mockMvc.perform(get("/api/interviews/{id}", id))
+        performAsOwner(get("/api/interviews/{id}", id))
                 .andExpect(status().isNotFound());
 
-        var listResult = mockMvc.perform(get("/api/interviews"))
+        var listResult = performAsOwner(get("/api/interviews"))
                 .andExpect(status().isOk())
                 .andReturn();
         assertThat(objectMapper.readTree(listResult.getResponse().getContentAsString()).size()).isZero();
@@ -160,7 +178,7 @@ class InterviewSessionIntegrationTest {
 
     @Test
     void returnsNotFoundWhenDeletingUnknownSession() throws Exception {
-        mockMvc.perform(delete("/api/interviews/{id}", 99999))
+        performAsOwner(delete("/api/interviews/{id}", 99999))
                 .andExpect(status().isNotFound());
     }
 
@@ -182,7 +200,7 @@ class InterviewSessionIntegrationTest {
         };
 
         for (String body : invalidRequests) {
-            mockMvc.perform(put("/api/interviews/{id}", 1)
+            performAsOwner(put("/api/interviews/{id}", 1)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body))
                     .andExpect(status().isBadRequest());
@@ -191,7 +209,7 @@ class InterviewSessionIntegrationTest {
 
     @Test
     void returnsEmptyArrayWhenThereAreNoSessions() throws Exception {
-        var result = mockMvc.perform(get("/api/interviews"))
+        var result = performAsOwner(get("/api/interviews"))
                 .andExpect(status().isOk())
                 .andReturn();
 
@@ -203,15 +221,15 @@ class InterviewSessionIntegrationTest {
     @Test
     void returnsMultipleSessionsNewestFirst() throws Exception {
         InterviewSession older = new InterviewSession(
-                "Backend Engineer", Difficulty.INTERMEDIATE, InterviewType.TECHNICAL, "Java");
+                "Backend Engineer", Difficulty.INTERMEDIATE, InterviewType.TECHNICAL, "Java", owner);
         InterviewSession newer = new InterviewSession(
-                "Product Manager", Difficulty.BEGINNER, InterviewType.BEHAVIORAL, "Leadership");
+                "Product Manager", Difficulty.BEGINNER, InterviewType.BEHAVIORAL, "Leadership", owner);
         ReflectionTestUtils.setField(older, "createdAt", Instant.parse("2026-01-01T10:00:00Z"));
         ReflectionTestUtils.setField(newer, "createdAt", Instant.parse("2026-01-02T10:00:00Z"));
         repository.save(older);
         repository.save(newer);
 
-        var result = mockMvc.perform(get("/api/interviews"))
+        var result = performAsOwner(get("/api/interviews"))
                 .andExpect(status().isOk())
                 .andReturn();
 
@@ -224,7 +242,7 @@ class InterviewSessionIntegrationTest {
 
     @Test
     void rejectsInvalidRoleAndEnumValue() throws Exception {
-        mockMvc.perform(post("/api/interviews")
+        performAsOwner(post("/api/interviews")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"role":" ","difficulty":"EXPERT",

@@ -39,8 +39,8 @@ public class QuestionGenerationService {
         this.promptService = promptService;
     }
 
-    public QuestionGenerationResponse generate(Long sessionId, GenerateQuestionsRequest request) {
-        InterviewSession session = sessionRepository.findById(sessionId)
+    public QuestionGenerationResponse generate(Long sessionId, Long ownerId, GenerateQuestionsRequest request) {
+        InterviewSession session = sessionRepository.findByIdAndOwner_Id(sessionId, ownerId)
                 .orElseThrow(() -> new InterviewSessionNotFoundException(sessionId));
         int requestedCount = request.numberOfQuestions();
         AiGeneratedQuestions generated = aiService.generateStructuredResponse(
@@ -67,8 +67,8 @@ public class QuestionGenerationService {
     }
 
     @Transactional(readOnly = true)
-    public List<GeneratedQuestionResponse> getQuestions(Long sessionId) {
-        sessionRepository.findById(sessionId)
+    public List<GeneratedQuestionResponse> getQuestions(Long sessionId, Long ownerId) {
+        sessionRepository.findByIdAndOwner_Id(sessionId, ownerId)
                 .orElseThrow(() -> new InterviewSessionNotFoundException(sessionId));
         return questionRepository.findAllByInterviewSession_IdOrderByIdAsc(sessionId).stream()
                 .map(this::toResponse)

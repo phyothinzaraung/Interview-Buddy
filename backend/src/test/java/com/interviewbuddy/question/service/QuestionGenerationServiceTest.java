@@ -43,7 +43,7 @@ class QuestionGenerationServiceTest {
 
     @BeforeEach
     void setUp() {
-        when(sessionRepository.findById(21L)).thenReturn(Optional.of(session));
+        when(sessionRepository.findByIdAndOwner_Id(21L, 7L)).thenReturn(Optional.of(session));
         doAnswer(invocation -> invocation.getArgument(0))
                 .when(questionRepository).saveAll(anyList());
     }
@@ -56,7 +56,7 @@ class QuestionGenerationServiceTest {
         doReturn(output).when(aiService).generateStructuredResponse(
                 anyString(), anyString(), eq(AiGeneratedQuestions.class));
 
-        var response = service.generate(21L, new GenerateQuestionsRequest(2));
+        var response = service.generate(21L, 7L, new GenerateQuestionsRequest(2));
 
         assertThat(response.questions()).hasSize(2);
         assertThat(response.questions().get(0).questionText()).isEqualTo("How does dependency injection work?");
@@ -86,7 +86,7 @@ class QuestionGenerationServiceTest {
                 .when(aiService).generateStructuredResponse(
                         anyString(), anyString(), eq(AiGeneratedQuestions.class));
 
-        assertThatThrownBy(() -> service.generate(21L, new GenerateQuestionsRequest(2)))
+        assertThatThrownBy(() -> service.generate(21L, 7L, new GenerateQuestionsRequest(2)))
                 .isInstanceOf(AiServiceException.class)
                 .hasMessage("The AI provider returned an invalid response.");
         verify(questionRepository, never()).saveAll(anyList());
@@ -104,7 +104,7 @@ class QuestionGenerationServiceTest {
                 .when(aiService).generateStructuredResponse(
                         anyString(), anyString(), eq(AiGeneratedQuestions.class));
 
-        assertThatThrownBy(() -> service.generate(21L, new GenerateQuestionsRequest(1)))
+        assertThatThrownBy(() -> service.generate(21L, 7L, new GenerateQuestionsRequest(1)))
                 .isInstanceOf(AiServiceException.class)
                 .hasMessage("The AI provider returned an invalid response.");
         verify(questionRepository, never()).saveAll(anyList());
@@ -154,9 +154,9 @@ class QuestionGenerationServiceTest {
 
     @Test
     void returnsNotFoundWhenInterviewSessionDoesNotExist() {
-        when(sessionRepository.findById(404L)).thenReturn(Optional.empty());
+        when(sessionRepository.findByIdAndOwner_Id(404L, 7L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.generate(404L, new GenerateQuestionsRequest(1)))
+        assertThatThrownBy(() -> service.generate(404L, 7L, new GenerateQuestionsRequest(1)))
                 .isInstanceOf(InterviewSessionNotFoundException.class);
         verify(aiService, never()).generateStructuredResponse(
                 anyString(), anyString(), eq(AiGeneratedQuestions.class));
@@ -174,7 +174,7 @@ class QuestionGenerationServiceTest {
         when(questionRepository.findAllByInterviewSession_IdOrderByIdAsc(21L))
                 .thenReturn(List.of(question));
 
-        List<GeneratedQuestionResponse> result = service.getQuestions(21L);
+        List<GeneratedQuestionResponse> result = service.getQuestions(21L, 7L);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).questionText()).isEqualTo("How does dependency injection work?");
@@ -189,14 +189,14 @@ class QuestionGenerationServiceTest {
     void returnsEmptyListWhenSessionHasNoQuestions() {
         when(questionRepository.findAllByInterviewSession_IdOrderByIdAsc(21L)).thenReturn(List.of());
 
-        assertThat(service.getQuestions(21L)).isEmpty();
+        assertThat(service.getQuestions(21L, 7L)).isEmpty();
     }
 
     @Test
     void returnsNotFoundWhenRetrievingQuestionsForMissingSession() {
-        when(sessionRepository.findById(404L)).thenReturn(Optional.empty());
+        when(sessionRepository.findByIdAndOwner_Id(404L, 7L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.getQuestions(404L))
+        assertThatThrownBy(() -> service.getQuestions(404L, 7L))
                 .isInstanceOf(InterviewSessionNotFoundException.class);
         verify(questionRepository, never()).findAllByInterviewSession_IdOrderByIdAsc(404L);
     }
@@ -214,7 +214,7 @@ class QuestionGenerationServiceTest {
         doReturn(response).when(aiService).generateStructuredResponse(
                 anyString(), anyString(), eq(AiGeneratedQuestions.class));
 
-        assertThatThrownBy(() -> service.generate(21L, new GenerateQuestionsRequest(requestedCount)))
+        assertThatThrownBy(() -> service.generate(21L, 7L, new GenerateQuestionsRequest(requestedCount)))
                 .isInstanceOf(AiServiceException.class)
                 .hasMessage("The AI provider returned an invalid response.");
         verify(questionRepository, never()).saveAll(anyList());

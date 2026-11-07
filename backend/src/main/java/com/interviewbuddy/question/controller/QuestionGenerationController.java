@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.Authentication;
 
 @RestController
 @RequestMapping("/api/interviews/{id}/questions")
@@ -29,12 +30,13 @@ public class QuestionGenerationController {
     @ResponseStatus(HttpStatus.CREATED)
     public QuestionGenerationResponse generate(
             @PathVariable Long id,
-            @Valid @RequestBody GenerateQuestionsRequest request) {
-        return service.generate(id, request);
+            @Valid @RequestBody GenerateQuestionsRequest request,
+            Authentication auth) {
+        return service.generate(id, Long.valueOf(auth.getName()), request);
     }
 
     @GetMapping
-    public List<GeneratedQuestionResponse> getQuestions(@PathVariable Long id) {
-        return service.getQuestions(id);
+    public List<GeneratedQuestionResponse> getQuestions(@PathVariable Long id, Authentication auth) {
+        return service.getQuestions(id, Long.valueOf(auth.getName()));
     }
 }

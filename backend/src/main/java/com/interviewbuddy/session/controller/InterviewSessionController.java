@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.security.core.Authentication;
 
 @RestController
 @RequestMapping("/api/interviews")
@@ -28,30 +29,35 @@ public class InterviewSessionController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public InterviewSessionResponse create(@Valid @RequestBody CreateInterviewSessionRequest request) {
-        return service.create(request);
+    public InterviewSessionResponse create(@Valid @RequestBody CreateInterviewSessionRequest request, Authentication auth) {
+        return service.create(request, userId(auth));
     }
 
     @PutMapping("/{id}")
     public InterviewSessionResponse update(
             @PathVariable Long id,
-            @Valid @RequestBody CreateInterviewSessionRequest request) {
-        return service.update(id, request);
+            @Valid @RequestBody CreateInterviewSessionRequest request,
+            Authentication auth) {
+        return service.update(id, userId(auth), request);
     }
 
     @GetMapping("/{id}")
-    public InterviewSessionResponse getById(@PathVariable Long id) {
-        return service.getById(id);
+    public InterviewSessionResponse getById(@PathVariable Long id, Authentication auth) {
+        return service.getById(id, userId(auth));
     }
 
     @GetMapping
-    public List<InterviewSessionResponse> getAll() {
-        return service.getAll();
+    public List<InterviewSessionResponse> getAll(Authentication auth) {
+        return service.getAll(userId(auth));
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void delete(@PathVariable Long id) {
-        service.delete(id);
+    public void delete(@PathVariable Long id, Authentication auth) {
+        service.delete(id, userId(auth));
+    }
+
+    private Long userId(Authentication authentication) {
+        return Long.valueOf(authentication.getName());
     }
 }

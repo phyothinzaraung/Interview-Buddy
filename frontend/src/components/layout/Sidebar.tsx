@@ -1,5 +1,6 @@
 import { BrainCircuit, LayoutDashboard, Settings2, Sparkles, X } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
+import { useAuth } from '../../auth/AuthContext'
 
 const navigation = [
   { label: 'Dashboard', to: '/', icon: LayoutDashboard, end: true },
@@ -14,6 +15,9 @@ type SidebarProps = {
 }
 
 export default function Sidebar({ open, onClose }: SidebarProps) {
+  const { user } = useAuth()
+  const initials = user?.name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join('') || 'U'
+
   return (
     <aside
       className={`fixed inset-y-0 left-0 z-40 flex w-[264px] flex-col border-r border-slate-200/80 bg-white transition-transform duration-200 ease-out lg:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`}
@@ -66,10 +70,10 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
           <p className="mt-1 text-[11px] leading-relaxed text-slate-500">A little preparation makes a big difference.</p>
         </div>
         <div className="mt-4 flex items-center gap-3 border-t border-slate-100 px-2 pt-4">
-          <div className="grid size-9 shrink-0 place-items-center rounded-full bg-slate-200 text-xs font-bold text-slate-600">JD</div>
+          <div className="grid size-9 shrink-0 place-items-center rounded-full bg-slate-200 text-xs font-bold text-slate-600">{initials}</div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-semibold text-slate-800">Jordan Davis</p>
-            <p className="truncate text-[11px] text-slate-500">Personal workspace</p>
+            <p className="truncate text-xs font-semibold text-slate-800">{user?.name ?? 'Your account'}</p>
+            <p className="truncate text-[11px] text-slate-500">{user?.email ?? 'Personal workspace'}</p>
           </div>
         </div>
       </div>

@@ -1,17 +1,18 @@
-# Secrets
+# Environment variables and secrets
 .env
 .env.*
 !.env.example
 **/.env
 **/.env.*
 
-# Java
+# Java / Maven
 **/target/
 
-# React
+# Node / React
 **/node_modules/
 **/dist/
 
-# IDE and OS
+# IDE
 .idea/
+.vscode/
 .DS_Store

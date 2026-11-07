@@ -7,6 +7,8 @@ import com.interviewbuddy.session.model.InterviewSession;
 import com.interviewbuddy.session.model.InterviewType;
 import com.interviewbuddy.session.exception.InterviewSessionNotFoundException;
 import com.interviewbuddy.session.repository.InterviewSessionRepository;
+import com.interviewbuddy.auth.model.UserAccount;
+import com.interviewbuddy.auth.repository.UserAccountRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -28,16 +30,20 @@ class InterviewSessionServiceTest {
     @Mock
     private InterviewSessionRepository repository;
 
+    @Mock
+    private UserAccountRepository userRepository;
+
     @InjectMocks
     private InterviewSessionService service;
 
     @Test
     void createsSessionAndTrimsTextFields() {
+        when(userRepository.findById(7L)).thenReturn(Optional.of(new UserAccount("Test User", "user@example.test", "hash")));
         when(repository.save(any(InterviewSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
         CreateInterviewSessionRequest request = new CreateInterviewSessionRequest(
                 "  Backend Engineer  ", Difficulty.INTERMEDIATE, InterviewType.TECHNICAL, "  Java  ");
 
-        var response = service.create(request);
+        var response = service.create(request, 7L);
 
         var captor = org.mockito.ArgumentCaptor.forClass(InterviewSession.class);
         verify(repository).save(captor.capture());
@@ -53,20 +59,20 @@ class InterviewSessionServiceTest {
     void getsSessionById() {
         InterviewSession session = new InterviewSession(
                 "Backend Engineer", Difficulty.INTERMEDIATE, InterviewType.TECHNICAL, "Java");
-        when(repository.findById(42L)).thenReturn(Optional.of(session));
+        when(repository.findByIdAndOwner_Id(42L, 7L)).thenReturn(Optional.of(session));
 
-        var response = service.getById(42L);
+        var response = service.getById(42L, 7L);
 
         assertThat(response.role()).isEqualTo("Backend Engineer");
         assertThat(response.status().name()).isEqualTo("NOT_STARTED");
-        verify(repository).findById(42L);
+        verify(repository).findByIdAndOwner_Id(42L, 7L);
     }
 
     @Test
     void throwsNotFoundWhenSessionDoesNotExist() {
-        when(repository.findById(404L)).thenReturn(Optional.empty());
+        when(repository.findByIdAndOwner_Id(404L, 7L)).thenReturn(Optional.empty());
 
-        assertThrows(InterviewSessionNotFoundException.class, () -> service.getById(404L));
+        assertThrows(InterviewSessionNotFoundException.class, () -> service.getById(404L, 7L));
     }
 
     @Test
@@ -76,11 +82,11 @@ class InterviewSessionServiceTest {
         Instant createdAt = Instant.parse("2026-01-01T10:00:00Z");
         ReflectionTestUtils.setField(session, "id", 42L);
         ReflectionTestUtils.setField(session, "createdAt", createdAt);
-        when(repository.findById(42L)).thenReturn(Optional.of(session));
+        when(repository.findByIdAndOwner_Id(42L, 7L)).thenReturn(Optional.of(session));
         CreateInterviewSessionRequest request = new CreateInterviewSessionRequest(
                 "  Product Manager  ", Difficulty.BEGINNER, InterviewType.BEHAVIORAL, "  Leadership  ");
 
-        var response = service.update(42L, request);
+        var response = service.update(42L, 7L, request);
 
         assertThat(response.id()).isEqualTo(42L);
         assertThat(response.role()).isEqualTo("Product Manager");
@@ -88,35 +94,35 @@ class InterviewSessionServiceTest {
         assertThat(response.interviewType()).isEqualTo(InterviewType.BEHAVIORAL);
         assertThat(response.topic()).isEqualTo("Leadership");
         assertThat(response.createdAt()).isEqualTo(createdAt);
-        verify(repository).findById(42L);
+        verify(repository).findByIdAndOwner_Id(42L, 7L);
     }
 
     @Test
     void updateThrowsNotFoundWhenSessionDoesNotExist() {
-        when(repository.findById(404L)).thenReturn(Optional.empty());
+        when(repository.findByIdAndOwner_Id(404L, 7L)).thenReturn(Optional.empty());
         CreateInterviewSessionRequest request = new CreateInterviewSessionRequest(
                 "Product Manager", Difficulty.BEGINNER, InterviewType.BEHAVIORAL, "Leadership");
 
-        assertThrows(InterviewSessionNotFoundException.class, () -> service.update(404L, request));
+        assertThrows(InterviewSessionNotFoundException.class, () -> service.update(404L, 7L, request));
     }
 
     @Test
     void deletesExistingSession() {
         InterviewSession session = new InterviewSession(
                 "Backend Engineer", Difficulty.INTERMEDIATE, InterviewType.TECHNICAL, "Java");
-        when(repository.findById(42L)).thenReturn(Optional.of(session));
+        when(repository.findByIdAndOwner_Id(42L, 7L)).thenReturn(Optional.of(session));
 
-        service.delete(42L);
+        service.delete(42L, 7L);
 
-        verify(repository).findById(42L);
+        verify(repository).findByIdAndOwner_Id(42L, 7L);
         verify(repository).delete(session);
     }
 
     @Test
     void deleteThrowsNotFoundWhenSessionDoesNotExist() {
-        when(repository.findById(404L)).thenReturn(Optional.empty());
+        when(repository.findByIdAndOwner_Id(404L, 7L)).thenReturn(Optional.empty());
 
-        assertThrows(InterviewSessionNotFoundException.class, () -> service.delete(404L));
+        assertThrows(InterviewSessionNotFoundException.class, () -> service.delete(404L, 7L));
     }
 
     @Test
@@ -125,24 +131,24 @@ class InterviewSessionServiceTest {
                 "Backend Engineer", Difficulty.INTERMEDIATE, InterviewType.TECHNICAL, "Java");
         InterviewSession second = new InterviewSession(
                 "Product Manager", Difficulty.BEGINNER, InterviewType.BEHAVIORAL, "Leadership");
-        when(repository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(first, second));
+        when(repository.findAllByOwner_IdOrderByCreatedAtDesc(7L)).thenReturn(List.of(first, second));
 
-        var responses = service.getAll();
+        var responses = service.getAll(7L);
 
         assertThat(responses).hasSize(2);
         assertThat(responses).extracting(InterviewSessionResponse::role)
                 .containsExactly("Backend Engineer", "Product Manager");
         assertThat(responses).extracting(InterviewSessionResponse::status)
                 .containsOnly(com.interviewbuddy.session.model.InterviewStatus.NOT_STARTED);
-        verify(repository).findAllByOrderByCreatedAtDesc();
+        verify(repository).findAllByOwner_IdOrderByCreatedAtDesc(7L);
     }
 
     @Test
     void getsEmptyListWhenNoSessionsExist() {
-        when(repository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of());
+        when(repository.findAllByOwner_IdOrderByCreatedAtDesc(7L)).thenReturn(List.of());
 
-        assertThat(service.getAll()).isEmpty();
-        verify(repository).findAllByOrderByCreatedAtDesc();
+        assertThat(service.getAll(7L)).isEmpty();
+        verify(repository).findAllByOwner_IdOrderByCreatedAtDesc(7L);
     }
 
 }

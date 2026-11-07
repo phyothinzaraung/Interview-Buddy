@@ -14,6 +14,8 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -34,6 +36,7 @@ class AiTestControllerTest {
 
         mockMvc.perform(post("/api/ai/test")
                         .contentType(MediaType.APPLICATION_JSON)
+                        .with(user("1")).with(csrf())
                         .content("""
                                 {"prompt":"Explain dependency injection in Spring Boot in simple terms."}
                                 """))
@@ -47,6 +50,7 @@ class AiTestControllerTest {
     void rejectsBlankPrompt() throws Exception {
         mockMvc.perform(post("/api/ai/test")
                         .contentType(MediaType.APPLICATION_JSON)
+                        .with(user("1")).with(csrf())
                         .content("{\"prompt\":\"  \"}"))
                 .andExpect(status().isBadRequest());
     }
@@ -58,6 +62,7 @@ class AiTestControllerTest {
 
         mockMvc.perform(post("/api/ai/test")
                         .contentType(MediaType.APPLICATION_JSON)
+                        .with(user("1")).with(csrf())
                         .content(body))
                 .andExpect(status().isBadRequest());
     }
@@ -69,6 +74,7 @@ class AiTestControllerTest {
 
         mockMvc.perform(post("/api/ai/test")
                         .contentType(MediaType.APPLICATION_JSON)
+                        .with(user("1")).with(csrf())
                         .content("{\"prompt\":\"test\"}"))
                 .andExpect(status().isBadGateway())
                 .andExpect(jsonPath("$.detail").value("The AI provider credentials are missing or were rejected."))
@@ -83,6 +89,7 @@ class AiTestControllerTest {
 
         mockMvc.perform(post("/api/ai/test")
                         .contentType(MediaType.APPLICATION_JSON)
+                        .with(user("1")).with(csrf())
                         .content("{\"prompt\":\"test\"}"))
                 .andExpect(status().isGatewayTimeout())
                 .andExpect(jsonPath("$.detail").value("The AI provider request timed out."));

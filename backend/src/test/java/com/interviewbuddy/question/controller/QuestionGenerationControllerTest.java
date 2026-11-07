@@ -18,6 +18,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -33,7 +35,7 @@ class QuestionGenerationControllerTest {
 
     @Test
     void validatesRequestAndReturnsGeneratedQuestionDtos() throws Exception {
-        when(service.generate(org.mockito.ArgumentMatchers.eq(12L), any()))
+        when(service.generate(org.mockito.ArgumentMatchers.eq(12L), org.mockito.ArgumentMatchers.eq(12L), any()))
                 .thenReturn(new QuestionGenerationResponse(List.of(new GeneratedQuestionResponse(
                         91L,
                         "How does dependency injection work?",
@@ -44,6 +46,7 @@ class QuestionGenerationControllerTest {
 
         mockMvc.perform(post("/api/interviews/{id}/questions/generate", 12)
                         .contentType(MediaType.APPLICATION_JSON)
+                        .with(user("12")).with(csrf())
                         .content("{\"numberOfQuestions\":1}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.questions[0].id").value(91))
@@ -56,34 +59,38 @@ class QuestionGenerationControllerTest {
     void rejectsQuestionCountsOutsideOneToTen() throws Exception {
         mockMvc.perform(post("/api/interviews/{id}/questions/generate", 12)
                         .contentType(MediaType.APPLICATION_JSON)
+                        .with(user("12")).with(csrf())
                         .content("{\"numberOfQuestions\":0}"))
                 .andExpect(status().isBadRequest());
 
         mockMvc.perform(post("/api/interviews/{id}/questions/generate", 12)
                         .contentType(MediaType.APPLICATION_JSON)
+                        .with(user("12")).with(csrf())
                         .content("{\"numberOfQuestions\":11}"))
                 .andExpect(status().isBadRequest());
 
         mockMvc.perform(post("/api/interviews/{id}/questions/generate", 12)
                         .contentType(MediaType.APPLICATION_JSON)
+                        .with(user("12")).with(csrf())
                         .content("{\"numberOfQuestions\":null}"))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
     void mapsMissingSessionToNotFound() throws Exception {
-        when(service.generate(org.mockito.ArgumentMatchers.eq(404L), any()))
+        when(service.generate(org.mockito.ArgumentMatchers.eq(404L), org.mockito.ArgumentMatchers.eq(12L), any()))
                 .thenThrow(new InterviewSessionNotFoundException(404L));
 
         mockMvc.perform(post("/api/interviews/{id}/questions/generate", 404)
                         .contentType(MediaType.APPLICATION_JSON)
+                        .with(user("12")).with(csrf())
                         .content("{\"numberOfQuestions\":1}"))
                 .andExpect(status().isNotFound());
     }
 
     @Test
     void returnsQuestionsForSession() throws Exception {
-        when(service.getQuestions(12L)).thenReturn(List.of(new GeneratedQuestionResponse(
+        when(service.getQuestions(12L, 12L)).thenReturn(List.of(new GeneratedQuestionResponse(
                 91L,
                 "How does dependency injection work?",
                 Difficulty.INTERMEDIATE,
@@ -91,7 +98,7 @@ class QuestionGenerationControllerTest {
                 List.of("Explains IoC accurately"),
                 List.of("IoC", "Spring beans"))));
 
-        mockMvc.perform(get("/api/interviews/{id}/questions", 12))
+        mockMvc.perform(get("/api/interviews/{id}/questions", 12).with(user("12")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(91))
                 .andExpect(jsonPath("$[0].questionText").value("How does dependency injection work?"))
@@ -103,9 +110,9 @@ class QuestionGenerationControllerTest {
 
     @Test
     void returnsEmptyArrayWhenSessionHasNoQuestions() throws Exception {
-        when(service.getQuestions(12L)).thenReturn(List.of());
+        when(service.getQuestions(12L, 12L)).thenReturn(List.of());
 
-        mockMvc.perform(get("/api/interviews/{id}/questions", 12))
+        mockMvc.perform(get("/api/interviews/{id}/questions", 12).with(user("12")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray())
                 .andExpect(jsonPath("$").isEmpty());
@@ -113,9 +120,9 @@ class QuestionGenerationControllerTest {
 
     @Test
     void mapsMissingSessionToNotFoundWhenRetrievingQuestions() throws Exception {
-        when(service.getQuestions(404L)).thenThrow(new InterviewSessionNotFoundException(404L));
+        when(service.getQuestions(404L, 12L)).thenThrow(new InterviewSessionNotFoundException(404L));
 
-        mockMvc.perform(get("/api/interviews/{id}/questions", 404))
+        mockMvc.perform(get("/api/interviews/{id}/questions", 404).with(user("12")))
                 .andExpect(status().isNotFound());
     }
 }

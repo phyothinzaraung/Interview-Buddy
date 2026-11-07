@@ -1,5 +1,7 @@
 package com.interviewbuddy.question;
 
+import com.interviewbuddy.auth.model.UserAccount;
+import com.interviewbuddy.auth.repository.UserAccountRepository;
 import com.interviewbuddy.question.model.InterviewQuestion;
 import com.interviewbuddy.question.repository.InterviewQuestionRepository;
 import com.interviewbuddy.session.model.Difficulty;
@@ -11,7 +13,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.test.context.TestPropertySource;
+import org.junit.jupiter.api.BeforeEach;
 import org.springframework.transaction.annotation.Transactional;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DataJpaTest
@@ -31,10 +36,23 @@ class InterviewQuestionRepositoryIntegrationTest {
     @Autowired
     private InterviewQuestionRepository questionRepository;
 
+    @Autowired
+    private UserAccountRepository userRepository;
+
+    @PersistenceContext
+    private EntityManager entityManager;
+
+    private UserAccount owner;
+
+    @BeforeEach
+    void createOwner() {
+        owner = userRepository.save(new UserAccount("Question Test Owner", "questions@example.test", "test-hash"));
+    }
+
     @Test
     void persistsQuestionAndStructuredDetailsForItsSession() {
         InterviewSession session = sessionRepository.save(new InterviewSession(
-                "Backend Engineer", Difficulty.INTERMEDIATE, InterviewType.TECHNICAL, "Spring Boot"));
+                "Backend Engineer", Difficulty.INTERMEDIATE, InterviewType.TECHNICAL, "Spring Boot", owner));
         InterviewQuestion question = questionRepository.save(new InterviewQuestion(
                 session,
                 "How does dependency injection work?",
@@ -56,7 +74,7 @@ class InterviewQuestionRepositoryIntegrationTest {
     @Test
     void retrievesQuestionsForSessionOrderedByIdAscending() {
         InterviewSession session = sessionRepository.save(new InterviewSession(
-                "Backend Engineer", Difficulty.INTERMEDIATE, InterviewType.TECHNICAL, "Spring Boot"));
+                "Backend Engineer", Difficulty.INTERMEDIATE, InterviewType.TECHNICAL, "Spring Boot", owner));
         InterviewQuestion first = questionRepository.save(new InterviewQuestion(
                 session, "First question", Difficulty.INTERMEDIATE, "Spring Boot",
                 List.of("Criterion"), List.of("Concept")));
@@ -75,7 +93,7 @@ class InterviewQuestionRepositoryIntegrationTest {
     @Test
     void deletingSessionRemovesItsOwnedQuestionsAndChildRows() {
         InterviewSession session = sessionRepository.save(new InterviewSession(
-                "Backend Engineer", Difficulty.INTERMEDIATE, InterviewType.TECHNICAL, "Spring Boot"));
+                "Backend Engineer", Difficulty.INTERMEDIATE, InterviewType.TECHNICAL, "Spring Boot", owner));
         questionRepository.save(new InterviewQuestion(
                 session,
                 "How does dependency injection work?",
@@ -84,7 +102,9 @@ class InterviewQuestionRepositoryIntegrationTest {
                 List.of("Explains IoC accurately"),
                 List.of("IoC", "Spring beans")));
 
-        sessionRepository.delete(session);
+        questionRepository.flush();
+        entityManager.clear();
+        sessionRepository.delete(sessionRepository.findById(session.getId()).orElseThrow());
         sessionRepository.flush();
 
         assertThat(questionRepository.count()).isZero();
