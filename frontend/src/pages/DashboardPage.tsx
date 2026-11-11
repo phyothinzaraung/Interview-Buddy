@@ -50,7 +50,8 @@ export default function DashboardPage() {
   }, [loadInterviews])
 
   const sortedInterviews = useMemo(
-    () => [...interviews].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)),
+    () => [...interviews].sort((a, b) =>
+      Date.parse(b.createdAt) - Date.parse(a.createdAt) || b.id - a.id),
     [interviews],
   )
   const recentCount = interviews.filter((interview) => {

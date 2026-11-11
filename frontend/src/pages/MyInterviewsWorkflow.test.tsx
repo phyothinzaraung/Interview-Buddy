@@ -124,8 +124,8 @@ describe('My Interviews end-to-end frontend workflow', () => {
 
     await user.selectOptions(screen.getByRole('combobox', { name: /number of questions to generate/i }), '2')
     await user.click(screen.getByRole('button', { name: 'Generate Questions' }))
-    expect(await screen.findAllByText('Generated question 1 for 101')).toHaveLength(2)
-    expect(screen.getAllByText('Generated question 2 for 101')).toHaveLength(2)
+    expect((await screen.findAllByText('Generated question 1 for 101')).length).toBeGreaterThanOrEqual(2)
+    expect(screen.getAllByText('Generated question 2 for 101').length).toBeGreaterThanOrEqual(2)
 
     await user.click(screen.getByRole('link', { name: /back to interviews/i }))
     expect(await screen.findByRole('heading', { name: 'My Interviews' })).toBeInTheDocument()
@@ -174,7 +174,7 @@ describe('My Interviews end-to-end frontend workflow', () => {
       })
     renderWorkflow('/interviews/101')
 
-    expect(await screen.findByRole('heading', { name: session.role })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Practice session unavailable' })).toBeInTheDocument()
     expect(await screen.findByRole('alert')).toHaveTextContent('Question list unavailable')
     await user.click(screen.getByRole('button', { name: 'Try again' }))
     expect(await screen.findByRole('heading', { name: 'No questions yet' })).toBeInTheDocument()

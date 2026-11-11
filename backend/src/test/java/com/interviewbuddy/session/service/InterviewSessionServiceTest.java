@@ -131,7 +131,7 @@ class InterviewSessionServiceTest {
                 "Backend Engineer", Difficulty.INTERMEDIATE, InterviewType.TECHNICAL, "Java");
         InterviewSession second = new InterviewSession(
                 "Product Manager", Difficulty.BEGINNER, InterviewType.BEHAVIORAL, "Leadership");
-        when(repository.findAllByOwner_IdOrderByCreatedAtDesc(7L)).thenReturn(List.of(first, second));
+        when(repository.findAllByOwner_IdOrderByCreatedAtDescIdDesc(7L)).thenReturn(List.of(first, second));
 
         var responses = service.getAll(7L);
 
@@ -140,15 +140,15 @@ class InterviewSessionServiceTest {
                 .containsExactly("Backend Engineer", "Product Manager");
         assertThat(responses).extracting(InterviewSessionResponse::status)
                 .containsOnly(com.interviewbuddy.session.model.InterviewStatus.CREATED);
-        verify(repository).findAllByOwner_IdOrderByCreatedAtDesc(7L);
+        verify(repository).findAllByOwner_IdOrderByCreatedAtDescIdDesc(7L);
     }
 
     @Test
     void getsEmptyListWhenNoSessionsExist() {
-        when(repository.findAllByOwner_IdOrderByCreatedAtDesc(7L)).thenReturn(List.of());
+        when(repository.findAllByOwner_IdOrderByCreatedAtDescIdDesc(7L)).thenReturn(List.of());
 
         assertThat(service.getAll(7L)).isEmpty();
-        verify(repository).findAllByOwner_IdOrderByCreatedAtDesc(7L);
+        verify(repository).findAllByOwner_IdOrderByCreatedAtDescIdDesc(7L);
     }
 
 }

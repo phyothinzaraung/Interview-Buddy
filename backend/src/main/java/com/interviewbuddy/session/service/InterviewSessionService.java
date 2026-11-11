@@ -54,7 +54,7 @@ public class InterviewSessionService {
 
     @Transactional(readOnly = true)
     public List<InterviewSessionResponse> getAll(Long ownerId) {
-        return repository.findAllByOwner_IdOrderByCreatedAtDesc(ownerId).stream()
+        return repository.findAllByOwner_IdOrderByCreatedAtDescIdDesc(ownerId).stream()
                 .map(this::toResponse)
                 .toList();
     }

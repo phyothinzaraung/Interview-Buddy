@@ -6,9 +6,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface InterviewSessionRepository extends JpaRepository<InterviewSession, Long> {
 
-    List<InterviewSession> findAllByOrderByCreatedAtDesc();
+    List<InterviewSession> findAllByOrderByCreatedAtDescIdDesc();
 
-    List<InterviewSession> findAllByOwner_IdOrderByCreatedAtDesc(Long ownerId);
+    List<InterviewSession> findAllByOwner_IdOrderByCreatedAtDescIdDesc(Long ownerId);
 
     java.util.Optional<InterviewSession> findByIdAndOwner_Id(Long id, Long ownerId);
 }

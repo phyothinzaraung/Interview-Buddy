@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.interviewbuddy.session.model.Difficulty;
 import com.interviewbuddy.session.model.InterviewSession;
+import com.interviewbuddy.session.model.InterviewStatus;
 import com.interviewbuddy.session.model.InterviewType;
 import com.interviewbuddy.session.repository.InterviewSessionRepository;
 import com.interviewbuddy.auth.model.UserAccount;
@@ -91,6 +92,12 @@ class InterviewSessionIntegrationTest {
         assertThat(response.path("createdAt").asText()).isNotBlank();
         assertThat(response.path("status").asText()).isEqualTo("CREATED");
         assertThat(repository.count()).isEqualTo(1);
+
+        JsonNode listed = objectMapper.readTree(performAsOwner(get("/api/interviews"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+        assertThat(listed).hasSize(1);
+        assertThat(listed.get(0).path("id").asLong()).isEqualTo(response.path("id").asLong());
     }
 
     @Test
@@ -263,6 +270,35 @@ class InterviewSessionIntegrationTest {
         assertThat(response.get(0).path("role").asText()).isEqualTo("Product Manager");
         assertThat(response.get(1).path("role").asText()).isEqualTo("Backend Engineer");
         assertThat(response.get(0).path("createdAt").asText()).isEqualTo("2026-01-02T10:00:00Z");
+    }
+
+    @Test
+    void listsEveryLifecycleStatusForOnlyTheAuthenticatedOwnerWithStableOrdering() throws Exception {
+        Instant createdAt = Instant.parse("2026-01-02T10:00:00Z");
+        for (InterviewStatus statusValue : InterviewStatus.values()) {
+            InterviewSession session = new InterviewSession(
+                    "Backend Engineer", Difficulty.INTERMEDIATE, InterviewType.TECHNICAL, "Java", owner);
+            session.setStatus(statusValue);
+            ReflectionTestUtils.setField(session, "createdAt", createdAt);
+            repository.save(session);
+        }
+
+        UserAccount otherOwner = userRepository.save(
+                new UserAccount("Other Owner", "other-owner@example.test", "not-a-real-login-hash"));
+        InterviewSession otherSession = new InterviewSession(
+                "Other Engineer", Difficulty.BEGINNER, InterviewType.BEHAVIORAL, "Leadership", otherOwner);
+        otherSession.setStatus(InterviewStatus.QUESTIONS_GENERATED);
+        ReflectionTestUtils.setField(otherSession, "createdAt", createdAt);
+        repository.save(otherSession);
+
+        JsonNode response = objectMapper.readTree(performAsOwner(get("/api/interviews"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+
+        assertThat(response).hasSize(InterviewStatus.values().length);
+        assertThat(response.findValuesAsText("status"))
+                .containsExactly("COMPLETED", "IN_PROGRESS", "QUESTIONS_GENERATED", "CREATED");
+        assertThat(response.findValuesAsText("role")).doesNotContain("Other Engineer");
     }
 
     @Test
