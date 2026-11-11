@@ -4,6 +4,7 @@ import com.interviewbuddy.auth.dto.AuthResponse;
 import com.interviewbuddy.auth.dto.LoginRequest;
 import com.interviewbuddy.auth.dto.RegisterRequest;
 import com.interviewbuddy.auth.dto.UserProfileResponse;
+import com.interviewbuddy.auth.exception.InvalidRefreshTokenException;
 import com.interviewbuddy.auth.security.SecurityProperties;
 import com.interviewbuddy.auth.service.AuthService;
 import com.interviewbuddy.auth.service.AuthSession;
@@ -65,7 +66,12 @@ public class AuthController {
     public AuthResponse refresh(
             @CookieValue(name = REFRESH_COOKIE, required = false) String refreshToken,
             HttpServletResponse response) {
-        return writeSession(authService.refresh(refreshToken), response);
+        try {
+            return writeSession(authService.refresh(refreshToken), response);
+        } catch (InvalidRefreshTokenException exception) {
+            response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie("", Duration.ZERO).toString());
+            throw exception;
+        }
     }
 
     @PostMapping("/logout")

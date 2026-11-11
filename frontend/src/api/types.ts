@@ -7,7 +7,7 @@ export const INTERVIEW_TYPES = ['TECHNICAL', 'BEHAVIORAL', 'SYSTEM_DESIGN'] as c
 export type InterviewType = (typeof INTERVIEW_TYPES)[number]
 
 /** Values mirror com.interviewbuddy.session.model.InterviewStatus. */
-export type InterviewStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED'
+export type InterviewStatus = 'CREATED' | 'QUESTIONS_GENERATED' | 'IN_PROGRESS' | 'COMPLETED'
 
 /** Request DTO: CreateInterviewSessionRequest (used by create and update). */
 export interface InterviewRequest {
@@ -36,14 +36,43 @@ export interface GenerateQuestionsRequest {
 /** Response DTO: GeneratedQuestionResponse. */
 export interface GeneratedQuestion {
   id: number
+  questionOrder: number
   questionText: string
+  suggestedAnswer: string | null
   difficulty: Difficulty
   topic: string
   evaluationCriteria: string[]
   expectedKeyConcepts: string[]
+  practiceAnswer: string | null
+  practiceAnswerUpdatedAt: string | null
+  completedAt: string | null
 }
 
 /** Response DTO: QuestionGenerationResponse. */
 export interface QuestionGenerationResponse {
   questions: GeneratedQuestion[]
+}
+
+/** Response DTO: PracticeAnswerResponse. */
+export interface PracticeAnswer {
+  questionId: number
+  answerText: string | null
+  updatedAt: string | null
+  completedAt: string | null
+}
+
+/** Response DTO: PracticeProgressResponse. */
+export interface PracticeProgress {
+  status: InterviewStatus
+  totalQuestions: number
+  answeredQuestions: number
+  completedQuestions: number
+  progressPercent: number
+}
+
+/** Response DTO: InterviewPracticeResponse. */
+export interface InterviewPractice {
+  session: Interview
+  questions: GeneratedQuestion[]
+  progress: PracticeProgress
 }

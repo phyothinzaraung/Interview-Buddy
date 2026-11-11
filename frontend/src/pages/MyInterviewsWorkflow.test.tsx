@@ -21,8 +21,11 @@ vi.mock('../api/interviewService', () => ({
 
 vi.mock('../api/questionService', () => ({
   questionService: {
+    getPracticeSession: vi.fn(),
     getQuestions: vi.fn(),
     generateQuestions: vi.fn(),
+    savePracticeAnswer: vi.fn(),
+    markQuestionCompleted: vi.fn(),
   },
 }))
 
@@ -51,7 +54,7 @@ describe('My Interviews end-to-end frontend workflow', () => {
       const created: Interview = {
         id: 101,
         ...request,
-        status: 'NOT_STARTED',
+        status: 'CREATED',
         createdAt: '2026-11-06T12:00:00Z',
       }
       sessions.push(created)
@@ -65,14 +68,35 @@ describe('My Interviews end-to-end frontend workflow', () => {
       return found
     })
     vi.mocked(questionService.getQuestions).mockImplementation(async (id) => [...(questionsBySession[id] ?? [])])
+    vi.mocked(questionService.getPracticeSession).mockImplementation(async (id) => {
+      const session = sessions.find((item) => item.id === id)
+      const questions = [...(questionsBySession[id] ?? [])]
+      const completed = questions.filter((question) => question.completedAt).length
+      return {
+        session: session!,
+        questions,
+        progress: {
+          status: questions.length === 0 ? 'CREATED' : completed === questions.length ? 'COMPLETED' : 'QUESTIONS_GENERATED',
+          totalQuestions: questions.length,
+          answeredQuestions: questions.filter((question) => question.practiceAnswer).length,
+          completedQuestions: completed,
+          progressPercent: questions.length ? Math.floor((completed * 100) / questions.length) : 0,
+        },
+      }
+    })
     vi.mocked(questionService.generateQuestions).mockImplementation(async (id, request) => {
       const generated = Array.from({ length: request.numberOfQuestions }, (_, index): GeneratedQuestion => ({
         id: 200 + index,
+        questionOrder: (questionsBySession[id]?.length ?? 0) + index + 1,
         questionText: `Generated question ${index + 1} for ${id}`,
+        suggestedAnswer: 'A role-specific sample answer.',
         difficulty: 'INTERMEDIATE',
         topic: 'Product strategy',
         evaluationCriteria: ['Clear prioritization'],
         expectedKeyConcepts: ['Impact'],
+        practiceAnswer: null,
+        practiceAnswerUpdatedAt: null,
+        completedAt: null,
       }))
       questionsBySession[id] = [...(questionsBySession[id] ?? []), ...generated]
       return { questions: generated }
@@ -100,8 +124,8 @@ describe('My Interviews end-to-end frontend workflow', () => {
 
     await user.selectOptions(screen.getByRole('combobox', { name: /number of questions to generate/i }), '2')
     await user.click(screen.getByRole('button', { name: 'Generate Questions' }))
-    expect(await screen.findByText('Generated question 1 for 101')).toBeInTheDocument()
-    expect(screen.getByText('Generated question 2 for 101')).toBeInTheDocument()
+    expect(await screen.findAllByText('Generated question 1 for 101')).toHaveLength(2)
+    expect(screen.getAllByText('Generated question 2 for 101')).toHaveLength(2)
 
     await user.click(screen.getByRole('link', { name: /back to interviews/i }))
     expect(await screen.findByRole('heading', { name: 'My Interviews' })).toBeInTheDocument()
@@ -112,7 +136,7 @@ describe('My Interviews end-to-end frontend workflow', () => {
     renderWorkflow('/interviews')
     expect(await screen.findByText('2 questions')).toBeInTheDocument()
     expect(screen.getByText('Questions Ready')).toBeInTheDocument()
-    expect(questionService.getQuestions).toHaveBeenCalledWith(101)
+    expect(questionService.getPracticeSession).toHaveBeenCalledWith(101)
   })
 
   it('shows the empty list state when there are no sessions', async () => {
@@ -135,9 +159,19 @@ describe('My Interviews end-to-end frontend workflow', () => {
     const user = userEvent.setup()
     const session: Interview = { ...interviewTemplate(), id: 101 }
     sessions = [session]
-    vi.mocked(questionService.getQuestions)
+    vi.mocked(questionService.getPracticeSession)
       .mockRejectedValueOnce(new Error('Question list unavailable'))
-      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce({
+        session,
+        questions: [],
+        progress: {
+          status: 'CREATED',
+          totalQuestions: 0,
+          answeredQuestions: 0,
+          completedQuestions: 0,
+          progressPercent: 0,
+        },
+      })
     renderWorkflow('/interviews/101')
 
     expect(await screen.findByRole('heading', { name: session.role })).toBeInTheDocument()
@@ -167,7 +201,7 @@ function interviewTemplate(): Interview {
     difficulty: 'INTERMEDIATE',
     interviewType: 'BEHAVIORAL',
     topic: 'Product strategy',
-    status: 'NOT_STARTED',
+    status: 'CREATED',
     createdAt: '2026-11-06T12:00:00Z',
   }
 }

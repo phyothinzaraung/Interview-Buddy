@@ -12,6 +12,7 @@ import com.interviewbuddy.question.repository.InterviewQuestionRepository;
 import com.interviewbuddy.session.exception.InterviewSessionNotFoundException;
 import com.interviewbuddy.session.model.Difficulty;
 import com.interviewbuddy.session.model.InterviewSession;
+import com.interviewbuddy.session.model.InterviewStatus;
 import com.interviewbuddy.session.model.InterviewType;
 import com.interviewbuddy.session.repository.InterviewSessionRepository;
 import java.util.List;
@@ -60,6 +61,8 @@ class QuestionGenerationServiceTest {
 
         assertThat(response.questions()).hasSize(2);
         assertThat(response.questions().get(0).questionText()).isEqualTo("How does dependency injection work?");
+        assertThat(response.questions().get(0).questionOrder()).isEqualTo(1);
+        assertThat(response.questions().get(0).suggestedAnswer()).contains("clear explanation");
         assertThat(response.questions().get(0).difficulty()).isEqualTo(Difficulty.INTERMEDIATE);
         assertThat(response.questions().get(0).topic()).isEqualTo("Spring Boot");
         assertThat(response.questions().get(0).evaluationCriteria()).containsExactly("Explains IoC accurately");
@@ -78,6 +81,33 @@ class QuestionGenerationServiceTest {
         questionsCaptor.getValue().forEach(savedQuestions::add);
         assertThat(savedQuestions).hasSize(2);
         assertThat(((InterviewQuestion) savedQuestions.get(0)).getInterviewSession()).isSameAs(session);
+        assertThat(((InterviewQuestion) savedQuestions.get(0)).getQuestionOrder()).isEqualTo(1);
+        assertThat(session.getStatus()).isEqualTo(com.interviewbuddy.session.model.InterviewStatus.QUESTIONS_GENERATED);
+    }
+
+    @Test
+    void appendsAfterLegacyQuestionsWithoutOrderValues() {
+        doReturn(new AiGeneratedQuestions(List.of(question("A newly generated question?"))))
+                .when(aiService).generateStructuredResponse(
+                        anyString(), anyString(), eq(AiGeneratedQuestions.class));
+        when(questionRepository.findMaxQuestionOrder(21L)).thenReturn(0);
+        when(questionRepository.countByInterviewSession_Id(21L)).thenReturn(4L);
+
+        var response = service.generate(21L, 7L, new GenerateQuestionsRequest(1));
+
+        assertThat(response.questions().getFirst().questionOrder()).isEqualTo(5);
+    }
+
+    @Test
+    void regeneratingQuestionsDoesNotMoveAnInProgressSessionBackwards() {
+        session.setStatus(InterviewStatus.IN_PROGRESS);
+        doReturn(new AiGeneratedQuestions(List.of(question("A follow-up question?"))))
+                .when(aiService).generateStructuredResponse(
+                        anyString(), anyString(), eq(AiGeneratedQuestions.class));
+
+        service.generate(21L, 7L, new GenerateQuestionsRequest(1));
+
+        assertThat(session.getStatus()).isEqualTo(InterviewStatus.IN_PROGRESS);
     }
 
     @Test
@@ -171,7 +201,7 @@ class QuestionGenerationServiceTest {
                 "Spring Boot",
                 List.of("Explains inversion of control"),
                 List.of("IoC", "Beans"));
-        when(questionRepository.findAllByInterviewSession_IdOrderByIdAsc(21L))
+        when(questionRepository.findAllByInterviewSession_IdOrderByQuestionOrderAsc(21L))
                 .thenReturn(List.of(question));
 
         List<GeneratedQuestionResponse> result = service.getQuestions(21L, 7L);
@@ -182,12 +212,12 @@ class QuestionGenerationServiceTest {
         assertThat(result.get(0).topic()).isEqualTo("Spring Boot");
         assertThat(result.get(0).evaluationCriteria()).containsExactly("Explains inversion of control");
         assertThat(result.get(0).expectedKeyConcepts()).containsExactly("IoC", "Beans");
-        verify(questionRepository).findAllByInterviewSession_IdOrderByIdAsc(21L);
+        verify(questionRepository).findAllByInterviewSession_IdOrderByQuestionOrderAsc(21L);
     }
 
     @Test
     void returnsEmptyListWhenSessionHasNoQuestions() {
-        when(questionRepository.findAllByInterviewSession_IdOrderByIdAsc(21L)).thenReturn(List.of());
+        when(questionRepository.findAllByInterviewSession_IdOrderByQuestionOrderAsc(21L)).thenReturn(List.of());
 
         assertThat(service.getQuestions(21L, 7L)).isEmpty();
     }
@@ -198,7 +228,7 @@ class QuestionGenerationServiceTest {
 
         assertThatThrownBy(() -> service.getQuestions(404L, 7L))
                 .isInstanceOf(InterviewSessionNotFoundException.class);
-        verify(questionRepository, never()).findAllByInterviewSession_IdOrderByIdAsc(404L);
+        verify(questionRepository, never()).findAllByInterviewSession_IdOrderByQuestionOrderAsc(404L);
     }
 
     private AiGeneratedQuestion question(String text) {

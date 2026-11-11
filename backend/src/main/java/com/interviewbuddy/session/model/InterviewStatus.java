@@ -1,7 +1,8 @@
 package com.interviewbuddy.session.model;
 
 public enum InterviewStatus {
-    NOT_STARTED,
+    CREATED,
+    QUESTIONS_GENERATED,
     IN_PROGRESS,
     COMPLETED
 }

@@ -4,6 +4,7 @@
 !.env.example
 **/.env
 **/.env.*
+!**/.env.example
 
 # Java / Maven
 **/target/
@@ -16,3 +17,5 @@
 .idea/
 .vscode/
 .DS_Store
+# Local Git backup
+.git-backup/

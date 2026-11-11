@@ -1,5 +1,5 @@
 import axios, { type InternalAxiosRequestConfig } from 'axios'
-import { normalizeApiError } from './apiError'
+import { ApiError, normalizeApiError } from './apiError'
 import type { AuthResponse } from './authTypes'
 
 const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim()
@@ -10,6 +10,7 @@ let accessToken: string | null = null
 let csrfToken: string | null = null
 let csrfRequest: Promise<string> | null = null
 let refreshRequest: Promise<AuthResponse> | null = null
+let refreshRejected = false
 
 export const apiClient = axios.create({
   baseURL,
@@ -23,6 +24,7 @@ export const apiClient = axios.create({
 
 export function setAccessToken(token: string | null): void {
   accessToken = token
+  if (token) refreshRejected = false
 }
 
 export function clearCsrfToken(): void {
@@ -64,7 +66,22 @@ function isAuthEndpoint(url?: string): boolean {
 
 type RetriableRequest = InternalAxiosRequestConfig & { _authRetried?: boolean }
 
-async function renewAccessToken(): Promise<AuthResponse> {
+function expiredSessionError(): ApiError {
+  return new ApiError('Your session has expired. Sign in again to continue.', { kind: 'http', status: 401 })
+}
+
+function expireSession(): void {
+  const wasAlreadyExpired = refreshRejected
+  refreshRejected = true
+  accessToken = null
+  if (!wasAlreadyExpired && typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('auth:expired'))
+  }
+}
+
+export async function refreshAuthSession(): Promise<AuthResponse> {
+  if (refreshRejected) throw expiredSessionError()
+
   if (!refreshRequest) {
     refreshRequest = (async () => {
       const csrf = await getCsrfToken(true)
@@ -80,12 +97,28 @@ async function renewAccessToken(): Promise<AuthResponse> {
       refreshRequest = null
     })
   }
-  return refreshRequest
+
+  try {
+    return await refreshRequest
+  } catch (error) {
+    const normalizedError = normalizeApiError(error)
+    if (normalizedError.status === 401) {
+      expireSession()
+      throw expiredSessionError()
+    }
+    throw normalizedError
+  }
+}
+
+async function requireAccessToken(): Promise<string> {
+  if (accessToken) return accessToken
+  return (await refreshAuthSession()).accessToken
 }
 
 apiClient.interceptors.request.use(async (config) => {
-  if (accessToken && !isAuthEndpoint(config.url)) {
-    config.headers.set('Authorization', `Bearer ${accessToken}`)
+  if (!isAuthEndpoint(config.url)) {
+    const token = await requireAccessToken()
+    config.headers.set('Authorization', `Bearer ${token}`)
   }
   if (!isSafeMethod(config.method)) {
     config.headers.set('X-XSRF-TOKEN', await getCsrfToken())
@@ -98,18 +131,17 @@ apiClient.interceptors.response.use(
   async (error: unknown) => {
     if (axios.isAxiosError(error)) {
       const request = error.config as RetriableRequest | undefined
-      if (error.response?.status === 401 && request && !request._authRetried && !isAuthEndpoint(request.url)) {
+      if (error.response?.status === 401 && request && !isAuthEndpoint(request.url)) {
+        if (request._authRetried) {
+          expireSession()
+          return Promise.reject(normalizeApiError(error))
+        }
         request._authRetried = true
         try {
-          const session = await renewAccessToken()
+          const session = await refreshAuthSession()
           request.headers.set('Authorization', `${session.tokenType} ${session.accessToken}`)
           return apiClient.request(request)
-        } catch (refreshError) {
-          const normalizedRefreshError = normalizeApiError(refreshError)
-          if (normalizedRefreshError.status === 401) {
-            setAccessToken(null)
-            if (typeof window !== 'undefined') window.dispatchEvent(new Event('auth:expired'))
-          }
+        } catch {
           return Promise.reject(normalizeApiError(error))
         }
       }

@@ -20,6 +20,8 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.transaction.annotation.Transactional;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -55,6 +57,9 @@ class InterviewSessionIntegrationTest {
     @Autowired
     private UserAccountRepository userRepository;
 
+    @PersistenceContext
+    private EntityManager entityManager;
+
     private UserAccount owner;
 
     @BeforeEach
@@ -84,7 +89,7 @@ class InterviewSessionIntegrationTest {
         assertThat(response.path("interviewType").asText()).isEqualTo("TECHNICAL");
         assertThat(response.path("topic").asText()).isEqualTo("Java");
         assertThat(response.path("createdAt").asText()).isNotBlank();
-        assertThat(response.path("status").asText()).isEqualTo("NOT_STARTED");
+        assertThat(response.path("status").asText()).isEqualTo("CREATED");
         assertThat(repository.count()).isEqualTo(1);
     }
 
@@ -103,8 +108,28 @@ class InterviewSessionIntegrationTest {
         assertThat(response.path("difficulty").asText()).isEqualTo("INTERMEDIATE");
         assertThat(response.path("interviewType").asText()).isEqualTo("TECHNICAL");
         assertThat(response.path("topic").asText()).isEqualTo("Java");
-        assertThat(response.path("status").asText()).isEqualTo("NOT_STARTED");
+        assertThat(response.path("status").asText()).isEqualTo("CREATED");
         assertThat(response.path("createdAt").asText()).isNotBlank();
+    }
+
+    @Test
+    void listsLegacyNotStartedRowsWithoutFailingAndExposesCurrentStatus() throws Exception {
+        InterviewSession saved = repository.save(new InterviewSession(
+                "Backend Engineer", Difficulty.INTERMEDIATE, InterviewType.TECHNICAL, "Java", owner));
+        repository.flush();
+        entityManager.createNativeQuery("UPDATE interview_sessions SET status = 'NOT_STARTED' WHERE id = :id")
+                .setParameter("id", saved.getId())
+                .executeUpdate();
+        entityManager.clear();
+
+        var result = performAsOwner(get("/api/interviews"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode response = objectMapper.readTree(result.getResponse().getContentAsString());
+        assertThat(response).hasSize(1);
+        assertThat(response.get(0).path("id").asLong()).isEqualTo(saved.getId());
+        assertThat(response.get(0).path("status").asText()).isEqualTo("CREATED");
     }
 
     @Test

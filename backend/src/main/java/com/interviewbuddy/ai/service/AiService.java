@@ -21,6 +21,8 @@ public class AiService {
             "(?i)\\bbearer\\s+[A-Za-z0-9._~+/-]+=*");
     private static final Pattern OPENAI_KEY = Pattern.compile(
             "(?i)\\bsk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{8,}\\b");
+    private static final Pattern PROVIDER_KEY_ERROR = Pattern.compile(
+            "(?i)(incorrect api key provided\\s*:\\s*)[^\\s,;\\\"'}]+");
     private static final Pattern SENSITIVE_PAYLOAD_FIELD = Pattern.compile(
             "(?i)((?:\\\"|')?(?:prompt|messages|content|input|request[_-]?body)(?:\\\"|')?\\s*[:=]\\s*)(\\\"(?:\\\\.|[^\\\"])*\\\"|'(?:\\\\.|[^'])*'|[^,;}\\s]+)");
 
@@ -122,6 +124,7 @@ public class AiService {
         sanitized = API_KEY_VALUE.matcher(sanitized).replaceAll("$1[REDACTED]");
         sanitized = BEARER_TOKEN.matcher(sanitized).replaceAll("Bearer [REDACTED]");
         sanitized = OPENAI_KEY.matcher(sanitized).replaceAll("[REDACTED_API_KEY]");
+        sanitized = PROVIDER_KEY_ERROR.matcher(sanitized).replaceAll("$1[REDACTED_API_KEY]");
         sanitized = SENSITIVE_PAYLOAD_FIELD.matcher(sanitized).replaceAll("$1[REDACTED]");
         sanitized = sanitized.replaceAll("[\\r\\n\\t]+", " ");
         return sanitized.length() <= 500 ? sanitized : sanitized.substring(0, 500) + "…";

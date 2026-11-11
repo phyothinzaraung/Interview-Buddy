@@ -16,12 +16,37 @@ function rejectUnauthorized(config: Parameters<AxiosAdapter>[0]): never {
 
 afterEach(() => {
   apiClient.defaults.adapter = originalAdapter
+  setAccessToken('test-reset')
   setAccessToken(null)
   clearCsrfToken()
   vi.restoreAllMocks()
 })
 
 describe('API client session renewal', () => {
+  it('restores a missing in-memory access token before sending a protected request', async () => {
+    vi.spyOn(axios, 'get').mockResolvedValue({ data: { token: 'csrf-value' } } as never)
+    const seen: Array<{ url: string; authorization: string | undefined }> = []
+    apiClient.defaults.adapter = async (config) => {
+      const authorization = config.headers.get('Authorization')?.toString()
+      seen.push({ url: config.url ?? '', authorization })
+      if (config.url === '/api/auth/refresh') {
+        return response(config, 200, {
+          accessToken: 'restored-access',
+          tokenType: 'Bearer',
+          expiresInSeconds: 900,
+          user: { id: 1, name: 'Jamie Chen', email: 'jamie@example.test', role: 'USER' },
+        })
+      }
+      if (config.url === '/api/private') return response(config, 200, { ok: true })
+      throw new Error(`Unexpected API request: ${config.url}`)
+    }
+
+    await expect(apiClient.get('/api/private')).resolves.toMatchObject({ data: { ok: true } })
+
+    expect(seen[0]).toMatchObject({ url: '/api/auth/refresh', authorization: undefined })
+    expect(seen[1]).toMatchObject({ url: '/api/private', authorization: 'Bearer restored-access' })
+  })
+
   it('renews an expired access token once and retries the protected request', async () => {
     vi.spyOn(axios, 'get').mockResolvedValue({ data: { token: 'csrf-value' } } as never)
     const seen: Array<{ url: string; authorization: string | undefined; csrf: string | undefined; credentials: boolean | undefined }> = []
@@ -68,5 +93,40 @@ describe('API client session renewal', () => {
     await expect(apiClient.get('/api/private')).rejects.toBeInstanceOf(ApiError)
     expect(onExpired).toHaveBeenCalledTimes(1)
     window.removeEventListener('auth:expired', onExpired)
+  })
+
+  it('fails before sending a protected call when no refresh session exists', async () => {
+    vi.spyOn(axios, 'get').mockResolvedValue({ data: { token: 'csrf-value' } } as never)
+    const requestedUrls: string[] = []
+    apiClient.defaults.adapter = async (config) => {
+      requestedUrls.push(config.url ?? '')
+      if (config.url === '/api/auth/refresh') return rejectUnauthorized(config)
+      throw new Error(`Protected request should not be sent: ${config.url}`)
+    }
+    const onExpired = vi.fn()
+    window.addEventListener('auth:expired', onExpired)
+
+    await expect(apiClient.get('/api/private')).rejects.toMatchObject({
+      message: 'Your session has expired. Sign in again to continue.',
+      status: 401,
+    })
+    expect(requestedUrls).toEqual(['/api/auth/refresh'])
+    expect(onExpired).toHaveBeenCalledTimes(1)
+    window.removeEventListener('auth:expired', onExpired)
+  })
+
+  it('does not retry an invalid refresh token after the session has expired', async () => {
+    vi.spyOn(axios, 'get').mockResolvedValue({ data: { token: 'csrf-value' } } as never)
+    const requestedUrls: string[] = []
+    apiClient.defaults.adapter = async (config) => {
+      requestedUrls.push(config.url ?? '')
+      if (config.url === '/api/auth/refresh') return rejectUnauthorized(config)
+      throw new Error(`Protected request should not be sent: ${config.url}`)
+    }
+
+    await expect(apiClient.get('/api/private')).rejects.toMatchObject({ status: 401 })
+    await expect(apiClient.get('/api/private')).rejects.toMatchObject({ status: 401 })
+
+    expect(requestedUrls).toEqual(['/api/auth/refresh'])
   })
 })

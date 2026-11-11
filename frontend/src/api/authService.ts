@@ -1,7 +1,5 @@
-import { apiClient, clearCsrfToken, getCsrfToken, setAccessToken } from './client'
+import { apiClient, clearCsrfToken, getCsrfToken, refreshAuthSession, setAccessToken } from './client'
 import type { AuthResponse, AuthenticatedUser, LoginRequest, RegisterRequest } from './authTypes'
-
-let restoreRequest: Promise<AuthenticatedUser> | null = null
 
 export const authService = {
   async login(request: LoginRequest): Promise<AuthResponse> {
@@ -24,19 +22,7 @@ export const authService = {
   },
 
   async restoreSession(): Promise<AuthenticatedUser> {
-    if (!restoreRequest) {
-      restoreRequest = (async () => {
-        const csrf = await getCsrfToken(true)
-        const { data } = await apiClient.post<AuthResponse>('/api/auth/refresh', {}, {
-          headers: { 'X-XSRF-TOKEN': csrf },
-        })
-        setAccessToken(data.accessToken)
-        return authService.getCurrentUser()
-      })().finally(() => {
-        restoreRequest = null
-      })
-    }
-    return restoreRequest
+    return (await refreshAuthSession()).user
   },
 
   async logout(): Promise<void> {

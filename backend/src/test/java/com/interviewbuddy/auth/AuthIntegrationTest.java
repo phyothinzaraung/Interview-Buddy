@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.context.TestPropertySource;
@@ -183,6 +184,24 @@ class AuthIntegrationTest {
     }
 
     @Test
+    void rejectsInvalidRefreshCookieAndExpiresItInTheResponse() throws Exception {
+        Csrf csrfToken = obtainCsrf();
+
+        MvcResult result = mockMvc.perform(post("/api/auth/refresh")
+                        .header("Origin", ORIGIN)
+                        .cookie(csrfToken.cookie(), new Cookie("refresh_token", "invalid-refresh-token"))
+                        .header("X-XSRF-TOKEN", csrfToken.value()))
+                .andExpect(status().isUnauthorized())
+                .andReturn();
+
+        assertThat(result.getResponse().getHeader(HttpHeaders.SET_COOKIE))
+                .contains("refresh_token=")
+                .contains("Max-Age=0")
+                .contains("Path=/api/auth")
+                .contains("HttpOnly");
+    }
+
+    @Test
     void rejectsCookieOperationsFromUntrustedOriginsAndProtectsAuthenticatedEndpoints() throws Exception {
         Csrf csrfToken = obtainCsrf();
         mockMvc.perform(post("/api/auth/refresh")
@@ -244,6 +263,7 @@ class AuthIntegrationTest {
         when(aiService.generateStructuredResponse(anyString(), anyString(), eq(AiGeneratedQuestions.class)))
                 .thenReturn(new AiGeneratedQuestions(List.of(new AiGeneratedQuestion(
                         "How do you design a resilient service?",
+                        "I identify failure modes, use bounded retries with backoff, and make operations idempotent.",
                         com.interviewbuddy.session.model.Difficulty.INTERMEDIATE,
                         "Java",
                         List.of("Explains failure handling"),
@@ -253,11 +273,19 @@ class AuthIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"numberOfQuestions\":1}"))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.questions.length()").value(1));
+                .andExpect(jsonPath("$.questions.length()").value(1))
+                .andExpect(jsonPath("$.questions[0].suggestedAnswer")
+                        .value("I identify failure modes, use bounded retries with backoff, and make operations idempotent."));
         mockMvc.perform(get("/api/interviews/{id}/questions", id)
                         .header("Authorization", "Bearer " + ownerToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].questionText").value("How do you design a resilient service?"));
+                .andExpect(jsonPath("$[0].questionText").value("How do you design a resilient service?"))
+                .andExpect(jsonPath("$[0].suggestedAnswer")
+                        .value("I identify failure modes, use bounded retries with backoff, and make operations idempotent."));
+        mockMvc.perform(get("/api/interviews/{id}", id)
+                        .header("Authorization", "Bearer " + ownerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("QUESTIONS_GENERATED"));
 
         mockMvc.perform(get("/api/interviews").header("Authorization", "Bearer " + ownerToken))
                 .andExpect(status().isOk()).andExpect(jsonPath("$").isArray())

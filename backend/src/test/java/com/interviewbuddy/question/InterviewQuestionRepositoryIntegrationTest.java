@@ -3,7 +3,9 @@ package com.interviewbuddy.question;
 import com.interviewbuddy.auth.model.UserAccount;
 import com.interviewbuddy.auth.repository.UserAccountRepository;
 import com.interviewbuddy.question.model.InterviewQuestion;
+import com.interviewbuddy.question.model.QuestionPracticeAnswer;
 import com.interviewbuddy.question.repository.InterviewQuestionRepository;
+import com.interviewbuddy.question.repository.QuestionPracticeAnswerRepository;
 import com.interviewbuddy.session.model.Difficulty;
 import com.interviewbuddy.session.model.InterviewSession;
 import com.interviewbuddy.session.model.InterviewType;
@@ -37,6 +39,9 @@ class InterviewQuestionRepositoryIntegrationTest {
     private InterviewQuestionRepository questionRepository;
 
     @Autowired
+    private QuestionPracticeAnswerRepository practiceAnswerRepository;
+
+    @Autowired
     private UserAccountRepository userRepository;
 
     @PersistenceContext
@@ -56,6 +61,8 @@ class InterviewQuestionRepositoryIntegrationTest {
         InterviewQuestion question = questionRepository.save(new InterviewQuestion(
                 session,
                 "How does dependency injection work?",
+                "It separates object construction from use. For example, Spring injects a repository into a service.",
+                1,
                 Difficulty.INTERMEDIATE,
                 "Spring Boot",
                 List.of("Explains IoC accurately", "Uses a relevant example"),
@@ -66,9 +73,33 @@ class InterviewQuestionRepositoryIntegrationTest {
 
         assertThat(persisted.getInterviewSession().getId()).isEqualTo(session.getId());
         assertThat(persisted.getQuestionText()).isEqualTo("How does dependency injection work?");
+        assertThat(persisted.getSuggestedAnswer()).contains("Spring injects a repository");
+        assertThat(persisted.getQuestionOrder()).isEqualTo(1);
         assertThat(persisted.getEvaluationCriteria())
                 .containsExactly("Explains IoC accurately", "Uses a relevant example");
         assertThat(persisted.getExpectedKeyConcepts()).containsExactly("IoC", "Spring beans");
+    }
+
+    @Test
+    void preservesLegacyQuestionAndSessionWhenOrderBackfillIsPending() {
+        InterviewSession session = sessionRepository.save(new InterviewSession(
+                "Backend Engineer", Difficulty.INTERMEDIATE, InterviewType.TECHNICAL, "Spring Boot", owner));
+        InterviewQuestion question = questionRepository.save(new InterviewQuestion(session,
+                "Existing question", "Existing suggested answer", 1, Difficulty.INTERMEDIATE,
+                "Spring Boot", List.of("Criterion"), List.of("Concept")));
+        questionRepository.flush();
+
+        entityManager.createNativeQuery("UPDATE interview_questions SET question_order = NULL WHERE id = :id")
+                .setParameter("id", question.getId())
+                .executeUpdate();
+        entityManager.clear();
+
+        InterviewQuestion persisted = questionRepository.findById(question.getId()).orElseThrow();
+        assertThat(persisted.getInterviewSession().getId()).isEqualTo(session.getId());
+        assertThat(persisted.getQuestionText()).isEqualTo("Existing question");
+        assertThat(persisted.getSuggestedAnswer()).isEqualTo("Existing suggested answer");
+        assertThat(persisted.getQuestionOrder()).isZero();
+        assertThat(persisted.getEvaluationCriteria()).containsExactly("Criterion");
     }
 
     @Test
@@ -76,18 +107,38 @@ class InterviewQuestionRepositoryIntegrationTest {
         InterviewSession session = sessionRepository.save(new InterviewSession(
                 "Backend Engineer", Difficulty.INTERMEDIATE, InterviewType.TECHNICAL, "Spring Boot", owner));
         InterviewQuestion first = questionRepository.save(new InterviewQuestion(
-                session, "First question", Difficulty.INTERMEDIATE, "Spring Boot",
+                session, "First question", "First answer", 1, Difficulty.INTERMEDIATE, "Spring Boot",
                 List.of("Criterion"), List.of("Concept")));
         InterviewQuestion second = questionRepository.save(new InterviewQuestion(
-                session, "Second question", Difficulty.INTERMEDIATE, "Spring Boot",
+                session, "Second question", "Second answer", 2, Difficulty.INTERMEDIATE, "Spring Boot",
                 List.of("Criterion"), List.of("Concept")));
         questionRepository.flush();
 
         List<InterviewQuestion> questions = questionRepository
-                .findAllByInterviewSession_IdOrderByIdAsc(session.getId());
+                .findAllByInterviewSession_IdOrderByQuestionOrderAsc(session.getId());
 
         assertThat(questions).extracting(InterviewQuestion::getId)
                 .containsExactly(first.getId(), second.getId());
+    }
+
+    @Test
+    void persistsAndRetrievesPracticeAnswerAndCompletion() {
+        InterviewSession session = sessionRepository.save(new InterviewSession(
+                "Backend Engineer", Difficulty.INTERMEDIATE, InterviewType.TECHNICAL, "Spring Boot", owner));
+        InterviewQuestion question = questionRepository.save(new InterviewQuestion(session,
+                "Explain dependency injection.", "An example answer.", 1, Difficulty.INTERMEDIATE,
+                "Spring Boot", List.of("Accuracy"), List.of("IoC")));
+        QuestionPracticeAnswer answer = new QuestionPracticeAnswer(question);
+        answer.updateAnswer("My own practice response.");
+        answer.markCompleted();
+        practiceAnswerRepository.saveAndFlush(answer);
+        entityManager.clear();
+
+        var persisted = questionRepository.findOwnedQuestion(question.getId(), session.getId(), owner.getId())
+                .orElseThrow().getPracticeAnswer();
+        assertThat(persisted.getAnswerText()).isEqualTo("My own practice response.");
+        assertThat(persisted.getUpdatedAt()).isNotNull();
+        assertThat(persisted.getCompletedAt()).isNotNull();
     }
 
     @Test

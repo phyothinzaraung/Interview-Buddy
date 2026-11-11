@@ -64,7 +64,7 @@ class InterviewSessionServiceTest {
         var response = service.getById(42L, 7L);
 
         assertThat(response.role()).isEqualTo("Backend Engineer");
-        assertThat(response.status().name()).isEqualTo("NOT_STARTED");
+        assertThat(response.status().name()).isEqualTo("CREATED");
         verify(repository).findByIdAndOwner_Id(42L, 7L);
     }
 
@@ -139,7 +139,7 @@ class InterviewSessionServiceTest {
         assertThat(responses).extracting(InterviewSessionResponse::role)
                 .containsExactly("Backend Engineer", "Product Manager");
         assertThat(responses).extracting(InterviewSessionResponse::status)
-                .containsOnly(com.interviewbuddy.session.model.InterviewStatus.NOT_STARTED);
+                .containsOnly(com.interviewbuddy.session.model.InterviewStatus.CREATED);
         verify(repository).findAllByOwner_IdOrderByCreatedAtDesc(7L);
     }
 

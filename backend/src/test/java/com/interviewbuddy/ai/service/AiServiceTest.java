@@ -68,7 +68,7 @@ class AiServiceTest {
 
     @Test
     void logsSafeAuthenticationDiagnosticsAndPreservesOriginalCause(CapturedOutput output) {
-        String fakeKey = "sk-proj-test-token-123456789";
+        String fakeKey = "fake-test-key";
         String fakeAuthorizationToken = "test-bearer-value-123456789";
         String prompt = "private interview payload";
         var unauthorized = HttpClientErrorException.create(

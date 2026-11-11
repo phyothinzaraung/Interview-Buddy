@@ -5,7 +5,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { ApiError } from '../api/apiError'
 import { interviewService } from '../api/interviewService'
 import { questionService } from '../api/questionService'
-import type { GeneratedQuestion, Interview, QuestionGenerationResponse } from '../api/types'
+import type { GeneratedQuestion, Interview, InterviewPractice, QuestionGenerationResponse } from '../api/types'
 import InterviewDetailsPage from './InterviewDetailsPage'
 import InterviewsPage from './InterviewsPage'
 
@@ -20,8 +20,11 @@ vi.mock('../api/interviewService', () => ({
 
 vi.mock('../api/questionService', () => ({
   questionService: {
+    getPracticeSession: vi.fn(),
     getQuestions: vi.fn(),
     generateQuestions: vi.fn(),
+    savePracticeAnswer: vi.fn(),
+    markQuestionCompleted: vi.fn(),
   },
 }))
 
@@ -31,26 +34,51 @@ const interview: Interview = {
   difficulty: 'INTERMEDIATE',
   interviewType: 'BEHAVIORAL',
   topic: 'Product strategy',
-  status: 'NOT_STARTED',
+  status: 'CREATED',
   createdAt: '2026-11-01T12:30:00Z',
 }
 
 const existingQuestion: GeneratedQuestion = {
   id: 1,
+  questionOrder: 1,
   questionText: 'How do you define a product strategy?',
+  suggestedAnswer: 'A product strategy aligns customer needs to business outcomes.',
   difficulty: 'INTERMEDIATE',
   topic: 'Product strategy',
   evaluationCriteria: ['Connects strategy to customer needs'],
   expectedKeyConcepts: ['Customer value'],
+  practiceAnswer: null,
+  practiceAnswerUpdatedAt: null,
+  completedAt: null,
 }
 
 const newlyGeneratedQuestion: GeneratedQuestion = {
   id: 2,
+  questionOrder: 2,
   questionText: 'How would you prioritize competing product requests?',
+  suggestedAnswer: 'I would compare impact, effort, and alignment with user needs.',
   difficulty: 'INTERMEDIATE',
   topic: 'Product strategy',
   evaluationCriteria: ['Explains prioritization tradeoffs'],
   expectedKeyConcepts: ['Impact', 'Effort'],
+  practiceAnswer: null,
+  practiceAnswerUpdatedAt: null,
+  completedAt: null,
+}
+
+function practiceSession(questions: GeneratedQuestion[] = []): InterviewPractice {
+  const completed = questions.filter((question) => question.completedAt).length
+  return {
+    session: interview,
+    questions,
+    progress: {
+      status: questions.length === 0 ? 'CREATED' : completed === questions.length ? 'COMPLETED' : 'QUESTIONS_GENERATED',
+      totalQuestions: questions.length,
+      answeredQuestions: questions.filter((question) => question.practiceAnswer).length,
+      completedQuestions: completed,
+      progressPercent: questions.length ? Math.floor((completed * 100) / questions.length) : 0,
+    },
+  }
 }
 
 function renderDetailsPage() {
@@ -70,18 +98,25 @@ describe('Interview details session actions', () => {
     vi.mocked(interviewService.getInterviews).mockResolvedValue([interview])
     vi.mocked(interviewService.getInterviewById).mockResolvedValue(interview)
     vi.mocked(questionService.getQuestions).mockResolvedValue([])
+    vi.mocked(questionService.getPracticeSession).mockResolvedValue(practiceSession())
   })
 
   it('navigates from My Interviews to the matching session and back', async () => {
     const user = userEvent.setup()
-    vi.mocked(questionService.getQuestions).mockResolvedValue([{
+    const question: GeneratedQuestion = {
       id: 7,
+      questionOrder: 1,
       questionText: 'Tell me about a time you changed a product direction.',
+      suggestedAnswer: 'Use a STAR story about new customer evidence.',
       difficulty: 'INTERMEDIATE',
       topic: 'Product strategy',
       evaluationCriteria: ['Explains the customer insight'],
       expectedKeyConcepts: ['User research', 'Tradeoffs'],
-    }])
+      practiceAnswer: null,
+      practiceAnswerUpdatedAt: null,
+      completedAt: null,
+    }
+    vi.mocked(questionService.getPracticeSession).mockResolvedValue(practiceSession([question]))
 
     render(
       <MemoryRouter initialEntries={['/interviews']}>
@@ -97,11 +132,11 @@ describe('Interview details session actions', () => {
 
     expect(await screen.findByRole('heading', { name: 'Product Designer' })).toBeInTheDocument()
     expect(screen.getAllByText('Product strategy')).toHaveLength(2)
-    expect(screen.getByText('Tell me about a time you changed a product direction.')).toBeInTheDocument()
+    expect(screen.getAllByText('Tell me about a time you changed a product direction.')).toHaveLength(2)
     expect(screen.getByText('Explains the customer insight')).toBeInTheDocument()
     expect(screen.getByText('User research')).toBeInTheDocument()
     expect(interviewService.getInterviewById).toHaveBeenCalledWith(42)
-    expect(questionService.getQuestions).toHaveBeenCalledWith(42)
+    expect(questionService.getPracticeSession).toHaveBeenCalledWith(42)
 
     await user.click(screen.getByRole('link', { name: /back to interviews/i }))
     expect(await screen.findByRole('heading', { name: 'My Interviews' })).toBeInTheDocument()
@@ -111,16 +146,16 @@ describe('Interview details session actions', () => {
     const user = userEvent.setup()
     let completeGeneration!: (response: QuestionGenerationResponse) => void
     const generationResult = new Promise<QuestionGenerationResponse>((resolve) => { completeGeneration = resolve })
-    vi.mocked(questionService.getQuestions)
-      .mockResolvedValueOnce([existingQuestion])
-      .mockResolvedValueOnce([existingQuestion, newlyGeneratedQuestion])
+    vi.mocked(questionService.getPracticeSession)
+      .mockResolvedValueOnce(practiceSession([existingQuestion]))
+      .mockResolvedValueOnce(practiceSession([existingQuestion, newlyGeneratedQuestion]))
     vi.mocked(questionService.generateQuestions).mockReturnValue(generationResult)
 
     renderDetailsPage()
-    await screen.findByText(existingQuestion.questionText)
+    await screen.findAllByText(existingQuestion.questionText)
     await user.selectOptions(screen.getByRole('combobox', { name: /number of questions to generate/i }), '3')
 
-    const generateButton = screen.getByRole('button', { name: 'Generate Questions' })
+    const generateButton = screen.getByRole('button', { name: 'Generate more' })
     await user.click(generateButton)
     expect(screen.getByRole('button', { name: /generating/i })).toBeDisabled()
     await user.click(screen.getByRole('button', { name: /generating/i }))
@@ -130,10 +165,10 @@ describe('Interview details session actions', () => {
     completeGeneration({ questions: [newlyGeneratedQuestion] })
 
     expect(await screen.findByRole('status')).toHaveTextContent('1 question generated successfully.')
-    expect(await screen.findByText(newlyGeneratedQuestion.questionText)).toBeInTheDocument()
-    expect(screen.getByText(existingQuestion.questionText)).toBeInTheDocument()
-    expect(questionService.getQuestions).toHaveBeenCalledTimes(2)
-    expect(questionService.getQuestions).toHaveBeenNthCalledWith(2, 42)
+    expect(await screen.findAllByText(newlyGeneratedQuestion.questionText)).toHaveLength(2)
+    expect(screen.getAllByText(existingQuestion.questionText)).toHaveLength(2)
+    expect(questionService.getPracticeSession).toHaveBeenCalledTimes(2)
+    expect(questionService.getPracticeSession).toHaveBeenNthCalledWith(2, 42)
   })
 
   it.each([
@@ -142,16 +177,16 @@ describe('Interview details session actions', () => {
     [new ApiError('The AI provider request failed.', { kind: 'http', status: 502 }), 'The AI provider request failed.'],
   ])('shows a useful generation error and leaves current questions intact', async (failure, expectedMessage) => {
     const user = userEvent.setup()
-    vi.mocked(questionService.getQuestions).mockResolvedValue([existingQuestion])
+    vi.mocked(questionService.getPracticeSession).mockResolvedValue(practiceSession([existingQuestion]))
     vi.mocked(questionService.generateQuestions).mockRejectedValue(failure)
 
     renderDetailsPage()
-    await screen.findByText(existingQuestion.questionText)
-    await user.click(screen.getByRole('button', { name: 'Generate Questions' }))
+    await screen.findAllByText(existingQuestion.questionText)
+    await user.click(screen.getByRole('button', { name: 'Generate more' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(expectedMessage)
-    expect(screen.getByText(existingQuestion.questionText)).toBeInTheDocument()
-    expect(questionService.getQuestions).toHaveBeenCalledTimes(1)
+    expect(screen.getAllByText(existingQuestion.questionText)).toHaveLength(2)
+    expect(questionService.getPracticeSession).toHaveBeenCalledTimes(1)
   })
 
   it('prepopulates the shared edit form, submits an update, and refreshes the displayed session', async () => {

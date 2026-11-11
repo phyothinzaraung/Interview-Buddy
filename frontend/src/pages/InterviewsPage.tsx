@@ -4,11 +4,11 @@ import { Link } from 'react-router-dom'
 import { ApiError } from '../api/apiError'
 import { interviewService } from '../api/interviewService'
 import { questionService } from '../api/questionService'
-import type { Difficulty, GeneratedQuestion, Interview, InterviewType } from '../api/types'
+import type { Difficulty, Interview, InterviewStatus, InterviewType } from '../api/types'
 import InterviewBadge from '../components/ui/InterviewBadge'
 import PageHeader from '../components/ui/PageHeader'
 
-type QuestionAvailability = { count: number; error: boolean }
+type QuestionAvailability = { count: number; completed: number; percent: number; status: InterviewStatus; error: boolean }
 
 const INTERVIEW_TYPES: { value: InterviewType | ''; label: string }[] = [
   { value: '', label: 'All interview types' },
@@ -53,18 +53,20 @@ export default function InterviewsPage() {
       const results = await interviewService.getInterviews()
       setInterviews(results)
 
-      // The session DTO has no question count, so fetch each count once per list load.
-      const questionResults = await Promise.allSettled(
-        results.map(async (interview) => {
-          const questions: GeneratedQuestion[] = await questionService.getQuestions(interview.id)
-          return [interview.id, { count: questions.length, error: false }] as const
-        }),
-      )
+      // The session DTO omits question progress; the practice endpoint provides it in one response per session.
+      const questionResults = await Promise.allSettled(results.map((interview) => questionService.getPracticeSession(interview.id)))
       const availability: Record<number, QuestionAvailability> = {}
       questionResults.forEach((result, index) => {
         const interview = results[index]
-        if (result.status === 'fulfilled') availability[result.value[0]] = result.value[1]
-        else availability[interview.id] = { count: 0, error: true }
+        if (result.status === 'fulfilled') {
+          availability[interview.id] = {
+            count: result.value.progress.totalQuestions,
+            completed: result.value.progress.completedQuestions,
+            percent: result.value.progress.progressPercent,
+            status: result.value.progress.status,
+            error: false,
+          }
+        } else availability[interview.id] = { count: 0, completed: 0, percent: 0, status: interview.status, error: true }
       })
       setQuestionAvailability(availability)
     } catch (cause) {
@@ -213,7 +215,15 @@ export default function InterviewsPage() {
                 <div className="mt-5 flex flex-wrap gap-2">
                   <InterviewBadge kind="type" value={interview.interviewType} />
                   <InterviewBadge kind="difficulty" value={interview.difficulty} />
+                  <InterviewBadge kind="status" value={availability?.status ?? interview.status} />
                 </div>
+
+                {!availability?.error && count > 0 && (
+                  <div className="mt-4" aria-label={`${availability.completed} of ${count} questions practiced`}>
+                    <div className="mb-1.5 flex items-center justify-between text-[11px] text-slate-500"><span>Practice progress</span><span>{availability.completed}/{count} completed</span></div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-brand-500 transition-[width]" style={{ width: `${availability.percent}%` }} /></div>
+                  </div>
+                )}
 
                 <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-500">

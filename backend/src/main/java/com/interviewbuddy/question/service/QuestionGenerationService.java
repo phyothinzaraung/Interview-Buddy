@@ -13,6 +13,7 @@ import com.interviewbuddy.question.repository.InterviewQuestionRepository;
 import com.interviewbuddy.session.exception.InterviewSessionNotFoundException;
 import com.interviewbuddy.session.model.InterviewSession;
 import com.interviewbuddy.session.repository.InterviewSessionRepository;
+import com.interviewbuddy.session.model.InterviewStatus;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -39,6 +40,7 @@ public class QuestionGenerationService {
         this.promptService = promptService;
     }
 
+    @Transactional
     public QuestionGenerationResponse generate(Long sessionId, Long ownerId, GenerateQuestionsRequest request) {
         InterviewSession session = sessionRepository.findByIdAndOwner_Id(sessionId, ownerId)
                 .orElseThrow(() -> new InterviewSessionNotFoundException(sessionId));
@@ -50,19 +52,33 @@ public class QuestionGenerationService {
 
         validate(generated, requestedCount, session);
 
-        List<InterviewQuestion> questions = generated.questions().stream()
-                .map(item -> new InterviewQuestion(
+        // Count also covers legacy rows whose newly-added order column is still null before V2 is applied.
+        int firstOrder = Math.max(
+                questionRepository.findMaxQuestionOrder(sessionId),
+                Math.toIntExact(questionRepository.countByInterviewSession_Id(sessionId)));
+        List<InterviewQuestion> questions = java.util.stream.IntStream.range(0, generated.questions().size())
+                .mapToObj(index -> {
+                    AiGeneratedQuestion item = generated.questions().get(index);
+                    return new InterviewQuestion(
                         session,
                         item.questionText().trim(),
+                        item.suggestedAnswer().trim(),
+                        firstOrder + index + 1,
                         session.getDifficulty(),
                         session.getTopic(),
                         normalize(item.evaluationCriteria()),
-                        normalize(item.expectedKeyConcepts())))
+                        normalize(item.expectedKeyConcepts()));
+                })
                 .toList();
 
         List<GeneratedQuestionResponse> savedQuestions = questionRepository.saveAll(questions).stream()
                 .map(this::toResponse)
                 .toList();
+        if (session.getStatus() == InterviewStatus.CREATED) {
+            session.setStatus(InterviewStatus.QUESTIONS_GENERATED);
+        } else if (session.getStatus() == InterviewStatus.COMPLETED) {
+            session.setStatus(InterviewStatus.IN_PROGRESS);
+        }
         return new QuestionGenerationResponse(savedQuestions);
     }
 
@@ -70,7 +86,7 @@ public class QuestionGenerationService {
     public List<GeneratedQuestionResponse> getQuestions(Long sessionId, Long ownerId) {
         sessionRepository.findByIdAndOwner_Id(sessionId, ownerId)
                 .orElseThrow(() -> new InterviewSessionNotFoundException(sessionId));
-        return questionRepository.findAllByInterviewSession_IdOrderByIdAsc(sessionId).stream()
+        return questionRepository.findAllByInterviewSession_IdOrderByQuestionOrderAsc(sessionId).stream()
                 .map(this::toResponse)
                 .toList();
     }
@@ -88,6 +104,9 @@ public class QuestionGenerationService {
                     || question.questionText() == null
                     || question.questionText().isBlank()
                     || question.questionText().length() > 1000
+                    || question.suggestedAnswer() == null
+                    || question.suggestedAnswer().isBlank()
+                    || question.suggestedAnswer().length() > 10000
                     || question.difficulty() != session.getDifficulty()
                     || question.topic() == null
                     || !question.topic().trim().equalsIgnoreCase(session.getTopic().trim())
@@ -118,10 +137,15 @@ public class QuestionGenerationService {
     private GeneratedQuestionResponse toResponse(InterviewQuestion question) {
         return new GeneratedQuestionResponse(
                 question.getId(),
+                question.getQuestionOrder(),
                 question.getQuestionText(),
+                question.getSuggestedAnswer(),
                 question.getDifficulty(),
                 question.getTopic(),
                 question.getEvaluationCriteria(),
-                question.getExpectedKeyConcepts());
+                question.getExpectedKeyConcepts(),
+                question.getPracticeAnswer() == null ? null : question.getPracticeAnswer().getAnswerText(),
+                question.getPracticeAnswer() == null ? null : question.getPracticeAnswer().getUpdatedAt(),
+                question.getPracticeAnswer() == null ? null : question.getPracticeAnswer().getCompletedAt());
     }
 }

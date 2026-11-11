@@ -2,6 +2,9 @@ import { apiClient } from './client'
 import type {
   GeneratedQuestion,
   GenerateQuestionsRequest,
+  InterviewPractice,
+  PracticeAnswer,
+  PracticeProgress,
   QuestionGenerationResponse,
 } from './types'
 
@@ -10,6 +13,31 @@ function questionsPath(interviewId: number): string {
 }
 
 export const questionService = {
+  async getPracticeSession(interviewId: number): Promise<InterviewPractice> {
+    const response = await apiClient.get<InterviewPractice>(`/api/interviews/${interviewId}/practice`)
+    return response.data
+  },
+
+  async getPracticeProgress(interviewId: number): Promise<PracticeProgress> {
+    const response = await apiClient.get<PracticeProgress>(`/api/interviews/${interviewId}/practice/progress`)
+    return response.data
+  },
+
+  async getPracticeAnswer(interviewId: number, questionId: number): Promise<PracticeAnswer> {
+    const response = await apiClient.get<PracticeAnswer>(`${questionsPath(interviewId)}/${questionId}/answer`)
+    return response.data
+  },
+
+  async savePracticeAnswer(interviewId: number, questionId: number, answerText: string): Promise<PracticeAnswer> {
+    const response = await apiClient.put<PracticeAnswer>(`${questionsPath(interviewId)}/${questionId}/answer`, { answerText })
+    return response.data
+  },
+
+  async markQuestionCompleted(interviewId: number, questionId: number): Promise<PracticeAnswer> {
+    const response = await apiClient.post<PracticeAnswer>(`${questionsPath(interviewId)}/${questionId}/complete`)
+    return response.data
+  },
+
   async generateQuestions(
     interviewId: number,
     request: GenerateQuestionsRequest,

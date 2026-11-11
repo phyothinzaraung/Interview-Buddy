@@ -4,6 +4,7 @@ import com.interviewbuddy.question.model.InterviewQuestion;
 import com.interviewbuddy.auth.model.UserAccount;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -43,9 +44,9 @@ public class InterviewSession {
     @Column(nullable = false, length = 100)
     private String topic;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20, columnDefinition = "varchar(20) default 'NOT_STARTED'")
-    private InterviewStatus status = InterviewStatus.NOT_STARTED;
+    @Convert(converter = InterviewStatusConverter.class)
+    @Column(nullable = false, length = 20, columnDefinition = "varchar(20) default 'CREATED'")
+    private InterviewStatus status = InterviewStatus.CREATED;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -89,7 +90,7 @@ public class InterviewSession {
             createdAt = Instant.now();
         }
         if (status == null) {
-            status = InterviewStatus.NOT_STARTED;
+            status = InterviewStatus.CREATED;
         }
     }
 
@@ -101,4 +102,5 @@ public class InterviewSession {
     public InterviewStatus getStatus() { return status; }
     public Instant getCreatedAt() { return createdAt; }
     public UserAccount getOwner() { return owner; }
+    public void setStatus(InterviewStatus status) { this.status = status; }
 }
